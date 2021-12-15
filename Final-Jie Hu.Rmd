@@ -1,0 +1,394 @@
+---
+title: "STAT 602_Final"
+author: "Jie Hu"
+date: "4/23/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#dry bean paper
+#table2(statistic summary)
+#table4(confusion matrix) #table8~table11
+#table6(performance metrics) #table12
+
+#figure9(decision tree)
+#fugure10(accuracy of all beans)
+
+#tested by 10-fold cross validation
+```{r}
+library(dplyr)
+library(ggplot2)
+library(viridis)
+library(hrbrthemes)
+library(corrplot)
+library(class)
+library(caret)
+library(rpart)
+library(maptree)
+library(pca3d)
+```
+
+
+```{r}
+labled <- read.csv('C:/course/602-mordern applied statistics 2/hw/final/labeled.csv') %>% select(-X)
+sampA <- read.csv('C:/course/602-mordern applied statistics 2/hw/final/samp.A.csv')%>% select(-X)
+sampB <- read.csv('C:/course/602-mordern applied statistics 2/hw/final/samp.B.csv')%>% select(-X)
+sampC <- read.csv('C:/course/602-mordern applied statistics 2/hw/final/samp.C.csv')%>% select(-X)
+```
+
+```{r}
+sum(labled%>%duplicated())
+sum(sampA%>%duplicated())
+sum(sampB%>%duplicated())
+sum(sampC%>%duplicated())
+names(labled)
+```
+
+```{r}
+summary(labled)
+```
+
+
+```{r}
+hist(labled$Area, freq = FALSE, breaks = 100)
+hist(labled$Perimeter, freq = FALSE, breaks = 100)
+hist(labled$MajorAxisLength, freq = FALSE, breaks = 100)
+hist(labled$MinorAxisLength, freq = FALSE, breaks = 100)
+hist(labled$Eccentricity, freq = FALSE, breaks = 100)
+hist(labled$ConvexArea, freq = FALSE, breaks = 100)
+hist(labled$Extent, freq = FALSE, breaks = 100)
+hist(labled$Area / labled$Extent, freq = FALSE, breaks = 100)
+```
+
+```{r}
+# sample size
+sample_size = labled %>% group_by(Class) %>% summarize(num=n())
+
+# Plot
+labled %>%
+  left_join(sample_size) %>%
+  mutate(myaxis = paste0(Class, "\n", "n=", num)) %>%
+  ggplot( aes(x=myaxis, y=Area, fill=Class)) +
+    geom_violin(width=1.4) +
+    geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_ipsum() +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("A Violin wrapping a boxplot") +
+    xlab("")
+
+labled %>%
+  left_join(sample_size) %>%
+  mutate(myaxis = paste0(Class, "\n", "n=", num)) %>%
+  ggplot( aes(x=myaxis, y=Perimeter, fill=Class)) +
+    geom_violin(width=1.4) +
+    geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_ipsum() +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("A Violin wrapping a boxplot") +
+    xlab("")
+
+labled %>%
+  left_join(sample_size) %>%
+  mutate(myaxis = paste0(Class, "\n", "n=", num)) %>%
+  ggplot( aes(x=myaxis, y=MajorAxisLength, fill=Class)) +
+    geom_violin(width=1.4) +
+    geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_ipsum() +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("A Violin wrapping a boxplot") +
+    xlab("")
+
+labled %>%
+  left_join(sample_size) %>%
+  mutate(myaxis = paste0(Class, "\n", "n=", num)) %>%
+  ggplot( aes(x=myaxis, y=MinorAxisLength, fill=Class)) +
+    geom_violin(width=1.4) +
+    geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_ipsum() +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("A Violin wrapping a boxplot") +
+    xlab("")
+
+labled %>%
+  left_join(sample_size) %>%
+  mutate(myaxis = paste0(Class, "\n", "n=", num)) %>%
+  ggplot( aes(x=myaxis, y=Eccentricity, fill=Class)) +
+    geom_violin(width=1.4) +
+    geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_ipsum() +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("A Violin wrapping a boxplot") +
+    xlab("")
+
+
+labled %>%
+  left_join(sample_size) %>%
+  mutate(myaxis = paste0(Class, "\n", "n=", num)) %>%
+  ggplot( aes(x=myaxis, y=ConvexArea, fill=Class)) +
+    geom_violin(width=1.4) +
+    geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_ipsum() +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("A Violin wrapping a boxplot") +
+    xlab("")
+
+labled %>%
+  left_join(sample_size) %>%
+  mutate(myaxis = paste0(Class, "\n", "n=", num)) %>%
+  ggplot( aes(x=myaxis, y=Extent, fill=Class)) +
+    geom_violin(width=1.4) +
+    geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    scale_fill_viridis(discrete = TRUE) +
+    theme_ipsum() +
+    theme(
+      legend.position="none",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("A Violin wrapping a boxplot") +
+    xlab("")
+```
+
+
+```{r}
+cor(labled%>% select(-Class))
+corrplot(cor(labled%>% select(-Class)), method = 'ellipse')
+```
+```{r}
+set.seed(12345)
+trn <- sample(1:3000,1800, replace = FALSE)
+dat.trn <- labled[trn,]
+dat.tst <- labled[-trn,]
+table(dat.trn$Class)
+table(dat.tst$Class)
+```
+
+```{r}
+dat.trn.sc <- scale(dat.trn %>% select(-Class))
+dat.tst.sc <- scale(dat.tst %>% select(-Class))
+```
+
+```{r}
+set.seed(12345)
+ar <- NULL
+for (i in seq(10, 200, by=10) ) {
+test <- knn.cv(dat.trn.sc,cl=dat.trn$Class, k=i)
+assign(paste('cm',i,sep = '.'), table(dat.trn$Class, test))
+ar[i/10] <- sum(test==dat.trn$Class)/length(dat.trn$Class)
+}
+plot(x=seq(10, 200, by=10), y=ar)
+```
+
+```{r}
+set.seed(12345)
+AR <- NULL
+for (i in seq(1, 50, by=1) ) {
+test <- knn.cv(dat.trn.sc,cl=dat.trn$Class, k=i)
+assign(paste('CM',i,sep = '.'), table(dat.trn$Class, test))
+AR[i] <- sum(test==dat.trn$Class)/length(dat.trn$Class)
+}
+plot(x=seq(1, 50, by=1), y=AR)
+max(AR)
+which(AR==max(AR))
+```
+
+
+```{r}
+set.seed(12345)
+knn.fit <- knn(dat.trn.sc, dat.tst.sc, dat.trn$Class, k=19)
+knn.cm <- table(dat.tst$Class, knn.fit)
+knn.cm
+#accuracy rate
+mean(dat.tst$Class==knn.fit)
+#error rate
+1-mean(dat.tst$Class==knn.fit)
+
+#each Class
+tp <- c(knn.cm[1,1], knn.cm[2,2], knn.cm[3,3], knn.cm[4,4], knn.cm[5,5], knn.cm[6,6])
+fn <- apply(knn.cm, 1, sum) - tp
+fp <- apply(knn.cm, 2, sum) - tp
+tn <- sum(knn.cm) - tp - fn - fp
+#precision
+tp/(tp+fp)
+mean(tp/(tp+fp))
+#recall
+tp/(tp+fn)
+mean(tp/(tp+fn))
+#specificity
+tn/(tn+fp)
+mean(tn/(tn+fp))
+#F1.score = 2*precision*recall / (precision+recall)
+(2* tp/(tp+fp)* tp/(tp+fn))/(tp/(tp+fp) + tp/(tp+fn))
+mean((2* tp/(tp+fp)* tp/(tp+fn))/(tp/(tp+fp) + tp/(tp+fn)))
+2*mean(tp/(tp+fp))*mean(tp/(tp+fn)) / (mean(tp/(tp+fp)) + mean(tp/(tp+fn)))
+```
+
+```{r}
+plot(-prcomp(dat.trn.sc)$x[,1:2], col=as.factor(dat.trn$Class), main = 'lable.trn (60%)')
+par(mfrow = c(1,2))
+plot(-prcomp(dat.tst.sc)$x[,1:2], col=as.factor(dat.tst$Class), main = 'lable.tst (40%) - true')
+plot(-prcomp(dat.tst.sc)$x[,1:2], col=as.factor(knn.fit), main = 'lable.tst (40%) - knn')
+```
+
+
+
+```{r}
+####TREE################
+tree <- rpart(Class~., data = dat.trn)
+
+draw.tree (tree, cex=.7, 
+           nodeinfo=TRUE, 
+           digits=1, print.levels=TRUE,
+           new=TRUE)
+
+table(dat.trn$Class)
+
+table(dat.trn$Class) / sum(table(dat.trn$Class))
+```
+
+
+```{r}
+tree.prob <- predict(tree, newdata = dat.tst)
+
+```
+
+
+
+```{r}
+#############pca#############
+pca.label <- prcomp(labled %>% select(-Class), scale = TRUE)
+pca.sampA <- prcomp(sampA, scale = TRUE)
+pca.sampB <- prcomp(sampB, scale = TRUE)
+pca.sampC <- prcomp(sampC, scale = TRUE)
+
+#plot the variance explained by the first few principal components.
+plot(pca.label)
+plot(pca.sampA)
+plot(pca.sampB)
+plot(pca.sampC)
+```
+
+
+```{r}
+pca3d(pca.label, group = factor(labled$Class))
+pca2d(pca.label, group=factor(labled$Class), biplot=TRUE, biplot.vars=3)
+
+pca3d(pca.sampA)
+pca3d(pca.sampB)
+pca3d(pca.sampC)
+```
+
+
+
+
+```{r}
+###########kmeans#################
+
+set.seed(12345)
+#pca vs true class
+plot(pca.label$x[,1:2], col = factor(labled$Class))
+#pac vs original variables fitted kmeans predicted cluster
+labled.kmeans <- kmeans(labled %>% select(-Class), 6, nstart = 20)
+plot(pca.label$x[,1:2], col = labled.kmeans$cluster)
+table(factor(labled$Class), labled.kmeans$cluster )
+#pca vs pc1 and pc2 fitted kmeans predicted cluster
+labled.kmeans <- kmeans(pca.label$x[,1:3], 6, nstart = 20)
+plot(pca.label$x[,1:2], col = labled.kmeans$cluster)
+table(factor(labled$Class), labled.kmeans$cluster)
+
+sampA.kmeans <- kmeans(pca.sampA$x[,1:3], 6, nstart = 20)
+plot(pca.sampA$x[,1:2], col = sampA.kmeans$cluster)
+
+sampB.kmeans <- kmeans(pca.sampB$x[,1:3], 5, nstart = 20)
+plot(pca.sampB$x[,1:2], col = sampB.kmeans$cluster)
+
+sampC.kmeans <- kmeans(pca.sampC$x[,1:3], 6, nstart = 20)
+plot(pca.sampC$x[,1:2], col = sampC.kmeans$cluster)
+```
+
+
+```{r}
+#########hclust#################################
+#pca vs true class
+plot(pca.label$x[,1:2], col = factor(labled$Class))
+#original data
+lable.hc <- hclust(dist(scale(labled %>% select(-Class))), method = 'complete')
+plot(lable.hc)
+lable.hc.clusters <- cutree(lable.hc,6)
+table(labled$Class, lable.hc.clusters)
+plot(pca.label$x[,1:2], col = factor(lable.hc.clusters))
+#pc1 and pc2
+lable.hc <- hclust(dist(pca.label$x[,1:2]), method = 'complete')
+plot(lable.hc)
+lable.hc.clusters <- cutree(lable.hc,6)
+table(labled$Class, lable.hc.clusters)
+plot(pca.label$x[,1:2], col = factor(lable.hc.clusters))
+```
+
+
+
+```{r}
+test <- rbind(labled%>%select(-Class), sampA)
+Class <- c(labled$Class,rep('Unknown', nrow(sampA)))
+test.pca <- prcomp(test, scale=TRUE)
+
+par(mfrow=c(1,2))
+#origin
+test.km <- kmeans(test, 6, nstart = 20)
+plot(test.pca$x[,1:2], col=as.factor(Class))
+plot(test.pca$x[,1:2], col=as.factor(test.km$cluster))
+#pc1 and pc2
+test.km <- kmeans(test.pca$x[,1:2], 6, nstart = 20)
+plot(test.pca$x[,1:2], col=as.factor(Class))
+plot(test.pca$x[,1:2], col=as.factor(test.km$cluster))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

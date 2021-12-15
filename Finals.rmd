@@ -1,0 +1,347 @@
+---
+title: "Final Project: Classification of Beans Using Maching learning Approach"
+output:
+  pdf:
+    code_folding: hide
+author: "Frida Gomam"
+date: 2020-12-01T21:13:14-05:00
+categories: ["R"]
+tags: ["R Markdown", "plot", "regression"]
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+#setwd("C:/Users/toshiba/Desktop/STAT602/602FINALS")
+lab=read.csv("labeled.csv")## import data
+dim(lab)
+lab1=lab[,-1]#delete 1st column by default(Id)
+dim(lab1)### 3000 obser and 8 variables
+
+
+summary(lab1)### summary of the varibles, ## no missing value in the data
+lab1$Class=as.factor(lab1$Class)## change class to factor
+
+levels(lab1$Class)## response has 6 levels
+attach(lab1)
+table(Class)## all the classes have the same freq of 500
+
+library(ggplot2)
+library(GGally)
+#ggpairs(lab1)## some of the variables are highly correlated
+cor(lab1[,-8])
+
+knitr::kable(cor(lab1[,-8]))## cant drop all the obs, so scale them.
+lab2=scale(lab1[,-8])
+
+
+knitr::kable(cor(lab1[,-8]))## scaling did not change the ouctome, ## only 7 predictors
+
+#use regsubset to select signicant factors## regsubest do a good job 4 a smaller dataset like this
+attach(lab1)
+library(leaps)
+reg.sub = regsubsets(Class ~ .,data=lab1,nvmax=5)
+sum.regsub = summary(reg.sub)##Area,Eccentricity,Extent =most sign variables
+cor(lab1[,c(1,5,7)])## variables are now not highly correlated with each oteher, multicollinearity is not a factor now.## cant include perimer beacuse it is highly correlated with area
+
+attach(lab1)
+## boxplot of the varaiables
+plot(Area~Class)
+plot(Perimeter~Class)
+plot(MajorAxisLength~Class)
+plot(MinorAxisLength~Class)## dont include this
+plot(Eccentricity~Class)
+plot(ConvexArea~Class)## dont inlcude
+plot(Extent~Class)##
+
+#histogram of the variables
+par(mfrow=c(1,2))
+hist(scale(Extent))## scaling will be a good idea
+hist(Extent)#
+hist(ConvexArea)## bimodal
+hist((Eccentricity))
+hist(Area)## bimodal
+hist(Perimeter)
+hist(MajorAxisLength)## bimodal
+  
+hist(MinorAxisLength)## bimodal 
+plot(Class)## all of equal size
+```
+
+
+
+
+```{r}
+library(e1071)
+library(randomForest)
+library(caret)
+library(mlbench)
+# Run algorithms using 10-fold cross validation
+control <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+tuneGrid="tunegrid"
+```
+
+
+
+```{r}
+set.seed(12345)
+dat=scale(lab1[,c(1,5,7)]) 
+data1=data.frame(dat,Class=lab1$Class)
+## 10 fold validation
+smp_size <- floor(0.6 *nrow(data1))
+# ## set the seed to make your partition reproducible
+train_ind <- sample(seq_len(nrow(data1)), size = smp_size)
+train <-data1[train_ind, ]
+test <- data1[-train_ind, ]
+fit.lda <- train(Class~ ., data=train , method="lda", metric=metric, trControl=control)## lda model
+
+fit.qda <- train(Class~ ., data=train , method="qda", metric=metric, trControl=control)## qda model
+
+
+fit.rf <- train(Class~., data=train , method="rf", metric=metric, trControl=control)#### random forest
+#summary(fit.glm)## 
+
+fit.knn <- train(Class~., data=train , method="knn", trControl=control)## optimal k of 5
+fit.nnet <- train(Class~., data=train , method="nnet",trControl=control)## u
+#library(tidyverse)
+#library(kernlab)
+fit.svm <- train(Class~., data=train, method="svmLinear",trControl=control)## 
+library(rpart)
+#fit.tree1 <- train(Class~ ., data=train , method="rpart",trControl=control,cp = 0.0001, minbucket = 20)
+##clustering technigue to do the groupings
+
+## deciosion tree
+dtree_fit <- train(Class~., data=train, method = "rpart",
+                   parms = list(split = "information"),
+                  trControl=control,
+                   tuneLength = 20)## decision tree
+#k-means method to it.
+
+#cluster into 6 groups to generate a Class for every  obs
+set.seed(123)
+fit.c_ctree <- train(Class~ ., data=train, method="ctree", metric=metric, trControl=control)
+install.packages("kernlab")
+library(kernlab)
+library(tidyverse)
+svm1 <- train(Class~ ., data=train, method = "svmLinear", trControl=control,  preProcess = c("center","scale"))## SVM for with a linear kernel 
+#View the model
+svm1 
+
+```
+##lda
+
+```{r}
+set.seed(12345)
+lda_predict <- predict(fit.lda,  newdata = test)
+
+b1=confusionMatrix(lda_predict, test$Class, positive = "BOMBAY")
+j=b1$table
+h=data.frame(round(b1$overall,4))
+Accuracy=h[1,]
+Error.rate=1-Accuracy
+r=data.frame(round(b1$byClass,4))
+pres=r[1:2,]
+
+```
+
+##qda
+```{r}
+
+set.seed(12345)
+qda_predict <- predict(fit.qda,  newdata = test)
+
+b2=confusionMatrix(qda_predict, test$Class, positive = "BOMBAY")
+j=b1$table
+h=data.frame(round(b1$overall,4))
+Accuracy=h[1,]
+Error.rate=1-Accuracy
+r=data.frame(round(b1$byClass,4))
+pres=r[1:2,]
+```
+
+
+##knn
+
+```{r}
+set.seed(12345)
+knn_predict <- predict(fit.knn,  newdata = test)
+
+b3=confusionMatrix(knn_predict, test$Class, positive = "BOMBAY")
+j=b1$table
+h=data.frame(round(b1$overall,4))
+Accuracy=h[1,]
+Error.rate=1-Accuracy
+r=data.frame(round(b1$byClass,4))
+pres=r[1:2,]
+```
+##nnet
+```{r}
+##nnet
+set.seed(12345)
+nnet_predict <- predict(fit.nnet,  newdata = test)
+
+b4=confusionMatrix(nnet_predict, test$Class, positive = "BOMBAY")
+j=b1$table
+h=data.frame(round(b1$overall,4))
+Accuracy=h[1,]
+Error.rate=1-Accuracy
+r=data.frame(round(b1$byClass,4))
+pres=r[1:2,]
+```
+
+##rf
+```{r}
+
+##rf
+set.seed(12345)
+rf_predict <- predict(fit.rf,  newdata = test)
+
+b5=confusionMatrix(rf_predict, test$Class, positive = "BOMBAY")
+j=b1$table
+h=data.frame(round(b1$overall,4))
+Accuracy=h[1,]
+Error.rate=1-Accuracy
+r=data.frame(round(b1$byClass,4))
+pres=r[1:2,]
+```
+
+##ctree
+```{r}
+set.seed(12345)
+fit.c_ctree_predict <- predict(fit.c_ctree,  newdata = test)
+
+
+b71=confusionMatrix(fit.c_ctree_predict , test$Class, positive = "BOMBAY")
+j=b1$table
+h=data.frame(round(b1$overall,4))
+Accuracy=h[1,]
+Error.rate=1-Accuracy
+r=data.frame(round(b1$byClass,4))
+pres=r[1:2,]
+
+```
+
+##rpart
+```{r}
+
+set.seed(12345)
+fit_ctree_predict1 <- predict(dtree_fit,  newdata = test)## decision tree
+
+
+b7a=confusionMatrix(fit_ctree_predict1 , test$Class, positive = "BOMBAY")
+```
+
+## svm
+```{r}
+
+
+set.seed(12345)
+svm1_predict1 <- predict(svm1,  newdata = test)## decision tree
+
+
+b7ab=confusionMatrix(svm1_predict1 , test$Class, positive = "BOMBAY")
+```
+
+
+```{r}
+
+## test data for sample A
+setwd("C:/Users/toshiba/Desktop/STAT602/602FINALS")
+testA=read.csv("samp.A.csv")## import data
+mlt=testA[,-1]
+test.A=data.frame(scale(mlt[,c(1,5,7)]))## test data
+
+dim(testA)
+summary(testA)
+
+#knitr::kable(cor(testA)[,-1])
+cor(test.A)
+
+
+```
+
+
+## lda predictions
+```{r}
+ 
+set.seed(12345)
+lda_predict <- predict(fit.lda,  newdata = test.A)
+test.Anew=data.frame(test.A,Class=lda_predict)
+
+summary(test.Anew$Class)
+
+b1t=confusionMatrix(lda_predict,test.Anew$Class)
+j=b1$table
+h=data.frame(round(b1$overall,4))
+Accuracy=h[1,]
+Error.rate=1-Accuracy
+r=data.frame(round(b1$byClass,4))
+pres=r[1:2,] 
+```
+
+
+
+
+```{r}
+
+set.seed(12345)
+qda_predict <- predict(fit.qda,  newdata = test.A)
+test.Anew1=data.frame(test.A,Class=qda_predict)
+
+summary(test.Anew1$Class)
+```
+
+```{r}
+
+### playing with it for fun
+set.seed(12345)
+l=kmeans(test.A, centers = 6, nstart = 20)## use K means clustering to get the levels and assign values.
+clusters=l$cluster
+new=data.frame(test.A,Class=clusters)
+new$Class=as.factor(new$Class)
+#new1=
+  ## randomlny assign values
+## randomnly replace the levels by the factor values.
+levels(new$Class) <-c("BOMBAY", "DERMASON", "HOROZ", "SIRA"," CALI"," SEKER")
+head(new)## new test data for sample A
+```
+
+
+```{r}
+
+set.seed(12345)
+km.out <- kmeans(train$Class,6,nstart=25)
+```
+
+## preict lda
+
+```{r}
+set.seed(202111)
+lda_predict <- predict(fit.glm,  newdata = test.A)
+
+
+b1=confusionMatrix(glm_predict, test.A$, positive = "Yes")
+j=b1$table
+h=data.frame(round(b1$overall,4))
+Accuracy=h[1,]
+Error.rate=1-Accuracy
+r=data.frame(round(b1$byClass,4))
+pres=r[1:2,]
+```
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Reference
+https://rpubs.com/phamdinhkhanh/389752
+https://bdtechtalks.com/2021/01/04/semi-supervised-machine-learning/
+https://bdtechtalks.com/2021/01/04/semi-supervised-machine-learning/
+https://dataaspirant.com/decision-tree-classifier-implementation-in-r/

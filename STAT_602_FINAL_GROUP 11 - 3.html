@@ -1,0 +1,1981 @@
+---
+title: "MODERN APPPLIED STATITICS - FINAL PROJECT "
+author: "Richard Acquah-Sarpong; Kenneth Annan; Iftekhar Chowdhury; Jie Hu; Siyi Lui"
+date: 2020-12-01T21:13:14-05:00
+categories: ["R"]
+tags: ["R Markdown", "plot", "regression"]
+---
+
+<script src="STAT_602_FINAL_GROUP 11 - 3_files/header-attrs/header-attrs.js"></script>
+<script src="STAT_602_FINAL_GROUP 11 - 3_files/kePrint/kePrint.js"></script>
+<link href="STAT_602_FINAL_GROUP 11 - 3_files/lightable/lightable.css" rel="stylesheet" />
+
+
+<div style="page-break-after: always;"></div>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>Dry bean- Phaseolus vulgaris L. is a major cultivated grain species in the genus Phaseolus that is widely consumed worldwide for its edible legume and pea pods (Heuze et al., 2015). Nevertheless, selecting the best seed species is one of the main concerns for both bean producers and the market. Since different genotypes are cultivated worldwide, it is important to separate the best seed variety from the mixed dry bean population, otherwise the market value of these mixed species of beans could drop enormously (Varankaya &amp; Ceyhan, 2012). The aim of our project is to develop an automated method to multiclass classification of dry beans that could predict the net worth of a given bean species harvested from a ‘population cultivation’ from a single farm when presented in the market.</p>
+<p>\</p>
+</div>
+<div id="methodology" class="section level2">
+<h2>Methodology</h2>
+<p>This is a multiclass classification problem. Therefore, we tried five supervised classifiers including Linear Discriminant Analysis (LDA), Quadratic Discriminant Analysis (QDA), K-Nearest Neighbors (KNN), Random Forest (RF), and Support Vector Machines (SVM). In this project, we first use the labeled dataset to fit these models with different feature selections, and compare their leave-one-out cross validation (LOOCV) performance, then choose the model with the best performance and do prediction on sample A, B, and C datasets. The last step is to use bootstrap technique to do a simulation and measure the prediction accuracy.</p>
+<p>Feature Selection: We have tried four different feature combinations. The first one uses all the 8 features. The second one uses only four variables: Area, Eccentricity, Extent, and Roundness in order to get rid of the effect of high correlation among other features. The third one uses only three variables: Area, Eccentricity, and Extend in order to see the effect of the newly added Roundness variable. The last one uses the first three principal components to check whether PCA helps denoise the dataset.</p>
+<p>Model description: Both LDA and QDA classifiers are based on Bayes’ theorem, with the assumption that every class is normally distributed. However, LDA has constant variance assumption among all classes, while QDA relaxes the assumption of constant variance among all classes. The LDA produces a linear decision boundary, while QDA produces a non-linear decision boundary. The QDA also requires more training data due to its non-constant variance assumption compared to LDA. The Random Forest classifier contains a large number of individual decision trees, where each individual tree in the random forest produces a class prediction and the class with the most votes becomes our model’s prediction. LOOCV is used to select the optimal number of features, ‘mtry’ and optimal number of trees, ‘ntree’. The KNN classifier predicts the observation class by finding the majority of the classes of the k-nearest training data points. Where, ‘nearest’ implies minimum Euclidean distance. LOOCV is used to find the optimal k (Figure 9). The SVM classifier identifies the best hyperplane that acts as a decision boundary among the different classes. We use a radial kernel for the SVM model in this project.</p>
+</div>
+<div id="results-discussion" class="section level2">
+<h2>Results &amp; Discussion</h2>
+<p>Our results (Figure 10) indicate that there is not much of a difference in performance for each of the five models while using all variables, four selected variables, and three selected variables. All these models underperform when three principal components are used. For each type of feature combination, QDA, Random Forest, and SVM consistently outperform other models. We selected QDA as our final model with all variables for predictions on sample A, B, and C. From Table 13, we see that all samples have a small number of predictions for BOMBAY. The classes with the highest prediction are CALI and SEKER for sample A, DERMASON for sample B, and HOROZ for sample C. We also visualize this comparison in Figure 12. Then we calculated the predicted price for each sample, the result is shown in the ‘Predicted.Net.Worth’ column of Table 17. Sample A is predicted to have higher price than Sample B and C. Finally, we construct the probability of count of each class given that the predicted class is one of the six classes (Table 16), and use it to do a bootstrap simulation and get the prediction interval for each sample (Table 17). Sample A has a narrower 2.5% to 97.5% price prediction interval, compared to Sample B and C.</p>
+</div>
+<div id="conclusion-recommendation" class="section level2">
+<h2>Conclusion &amp; Recommendation</h2>
+<p>QDA, Random Forest, and SVM did a good job of predicting the beans classes, their LOOCV accuracy rates are all 90%. Extent and Eccentricity are good predictors, Area, Perimeter, MajorAxisLength, MinorAxisLength, and ConvexArea are highly correlated, either one of them can be a good predictor. The newly added variable Roundness does not add much prediction power to our models. With the final model we used, QDA, it has a better prediction accuracy for Sample A compared to Sample B and C. We recommend using any one of these three models (QDA, Random Forest, and SVM), and including Extent, Eccentricity and at least one of the five highly correlated features as predictors to automate the classification of dry beans.</p>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="appendix" class="section level1 tabset">
+<h1>Appendix</h1>
+<pre class="r"><code>labeled &lt;- read.csv(&#39;labeled.csv&#39;) %&gt;% dplyr::select(-X)
+sampA &lt;- read.csv(&#39;samp.A.csv&#39;)%&gt;% dplyr::select(-X)
+sampB &lt;- read.csv(&#39;samp.B.csv&#39;)%&gt;% dplyr::select(-X)
+sampC &lt;- read.csv(&#39;samp.C.csv&#39;)%&gt;% dplyr::select(-X)
+#convert Class into factor
+labeled$Class &lt;- as.factor(labeled$Class)
+
+#set up a new variable &#39;Roundness&#39;
+#Roundness = 4*Area*pi/(perimeter)^2 (refer to the dry bean paper)
+Roundess &lt;- 4*pi*labeled$Area/(labeled$Perimeter)^2
+labeled &lt;- add_column(labeled, Roundness = Roundess, .after = 7)
+sampA$Roundness &lt;- 4*pi*sampA$Area/(sampA$Perimeter)^2
+sampB$Roundness &lt;- 4*pi*sampB$Area/(sampB$Perimeter)^2
+sampC$Roundness &lt;- 4*pi*sampC$Area/(sampC$Perimeter)^2
+
+#check for duplicate rows
+dup.rows = sum(labeled%&gt;%duplicated(), sampA%&gt;%duplicated(),
+               sampB%&gt;%duplicated(),sampC%&gt;%duplicated())</code></pre>
+<div id="summary-statistic" class="section level3 tabset">
+<h3>Summary Statistic</h3>
+<p>For this project, we used two datasets namely ‘labeled’ and ‘unlabeled’ sets. The labeled (training) dataset contains 3000 observations and 8 variables. The dependent variable has 6 levels (Classes): BOMBAY, CALI, DERMASON, HOROZ, SEKER, and SIRA. Each class has 500 observations. The unlabeled dataset is drawn from the three samples namely Sample A, B, and C. The total observations for sample A, B, and C are 777, 1373, and 982 respectively. Roundness, which is the measure of how closely the shape of beans approaches a perfect circle, was calculated and added as an additional predictor variable (Koklu &amp; Ozkan, 2020). Tables 1 through 4 show the summary statistics of the variables in the labeled data, Sample A, B, and C, respectively .</p>
+<pre class="r"><code>summary.stats &lt;- round(as.data.frame((labeled[,-9])%&gt;%psych::describe())%&gt;%dplyr::select(n,mean, sd, median, min, max, range, se), 3)
+kable(summary.stats, caption=&quot;Statistical distribution of features of dry beans varieties (in pixels) - Label&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+<span id="tab:unnamed-chunk-3">Table 1: </span>Statistical distribution of features of dry beans varieties (in pixels) - Label
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+</th>
+<th style="text-align:right;">
+n
+</th>
+<th style="text-align:right;">
+mean
+</th>
+<th style="text-align:right;">
+sd
+</th>
+<th style="text-align:right;">
+median
+</th>
+<th style="text-align:right;">
+min
+</th>
+<th style="text-align:right;">
+max
+</th>
+<th style="text-align:right;">
+range
+</th>
+<th style="text-align:right;">
+se
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+Area
+</td>
+<td style="text-align:right;">
+3000
+</td>
+<td style="text-align:right;">
+69874.978
+</td>
+<td style="text-align:right;">
+49578.516
+</td>
+<td style="text-align:right;">
+48714.500
+</td>
+<td style="text-align:right;">
+20645.000
+</td>
+<td style="text-align:right;">
+251320.000
+</td>
+<td style="text-align:right;">
+230675.000
+</td>
+<td style="text-align:right;">
+905.176
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Perimeter
+</td>
+<td style="text-align:right;">
+3000
+</td>
+<td style="text-align:right;">
+1012.238
+</td>
+<td style="text-align:right;">
+347.749
+</td>
+<td style="text-align:right;">
+941.897
+</td>
+<td style="text-align:right;">
+384.169
+</td>
+<td style="text-align:right;">
+2164.100
+</td>
+<td style="text-align:right;">
+1779.931
+</td>
+<td style="text-align:right;">
+6.349
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+MajorAxisLength
+</td>
+<td style="text-align:right;">
+3000
+</td>
+<td style="text-align:right;">
+362.048
+</td>
+<td style="text-align:right;">
+124.520
+</td>
+<td style="text-align:right;">
+332.901
+</td>
+<td style="text-align:right;">
+161.517
+</td>
+<td style="text-align:right;">
+740.969
+</td>
+<td style="text-align:right;">
+579.452
+</td>
+<td style="text-align:right;">
+2.273
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+MinorAxisLength
+</td>
+<td style="text-align:right;">
+3000
+</td>
+<td style="text-align:right;">
+225.193
+</td>
+<td style="text-align:right;">
+73.350
+</td>
+<td style="text-align:right;">
+202.735
+</td>
+<td style="text-align:right;">
+106.003
+</td>
+<td style="text-align:right;">
+473.395
+</td>
+<td style="text-align:right;">
+367.391
+</td>
+<td style="text-align:right;">
+1.339
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Eccentricity
+</td>
+<td style="text-align:right;">
+3000
+</td>
+<td style="text-align:right;">
+0.756
+</td>
+<td style="text-align:right;">
+0.102
+</td>
+<td style="text-align:right;">
+0.773
+</td>
+<td style="text-align:right;">
+0.301
+</td>
+<td style="text-align:right;">
+0.945
+</td>
+<td style="text-align:right;">
+0.644
+</td>
+<td style="text-align:right;">
+0.002
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+ConvexArea
+</td>
+<td style="text-align:right;">
+3000
+</td>
+<td style="text-align:right;">
+70944.115
+</td>
+<td style="text-align:right;">
+50382.269
+</td>
+<td style="text-align:right;">
+50807.500
+</td>
+<td style="text-align:right;">
+8912.000
+</td>
+<td style="text-align:right;">
+259965.000
+</td>
+<td style="text-align:right;">
+251053.000
+</td>
+<td style="text-align:right;">
+919.850
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Extent
+</td>
+<td style="text-align:right;">
+3000
+</td>
+<td style="text-align:right;">
+0.753
+</td>
+<td style="text-align:right;">
+0.052
+</td>
+<td style="text-align:right;">
+0.766
+</td>
+<td style="text-align:right;">
+0.571
+</td>
+<td style="text-align:right;">
+0.850
+</td>
+<td style="text-align:right;">
+0.279
+</td>
+<td style="text-align:right;">
+0.001
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Roundness
+</td>
+<td style="text-align:right;">
+3000
+</td>
+<td style="text-align:right;">
+0.840
+</td>
+<td style="text-align:right;">
+0.294
+</td>
+<td style="text-align:right;">
+0.771
+</td>
+<td style="text-align:right;">
+0.391
+</td>
+<td style="text-align:right;">
+2.056
+</td>
+<td style="text-align:right;">
+1.664
+</td>
+<td style="text-align:right;">
+0.005
+</td>
+</tr>
+</tbody>
+</table>
+<p>The variables, Area and Convex Area, had the largest range for all four datasets. There are large differences in the range of variables, the variables with larger ranges will dominate over those with small ranges which may lead to biased results, therefore it is necessary to transform/scale these variables before fitting our distance-based models (i.e., KNN and SVM).</p>
+</div>
+<div id="labeled-data-variance-check-for-each-classes" class="section level3">
+<h3>labeled data: variance check for each classes</h3>
+<pre class="r"><code>var.tab1 &lt;- labeled%&gt;%group_by(Class)%&gt;%summarize(Var.Area=var(Area),Var.Perimeter=var(Perimeter), var.Maj.Axis.=var(MajorAxisLength),var.Min.Axis.=var(MinorAxisLength), var.Eccentricity=min(Eccentricity), var.ConvexArea=max(ConvexArea), var.Extent=max(Extent), var.Roundness=max(Roundness))
+
+
+kable(var.tab1, caption = &quot;Variance of distribution&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+<span id="tab:unnamed-chunk-4">Table 2: </span>Variance of distribution
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+Class
+</th>
+<th style="text-align:right;">
+Var.Area
+</th>
+<th style="text-align:right;">
+Var.Perimeter
+</th>
+<th style="text-align:right;">
+var.Maj.Axis.
+</th>
+<th style="text-align:right;">
+var.Min.Axis.
+</th>
+<th style="text-align:right;">
+var.Eccentricity
+</th>
+<th style="text-align:right;">
+var.ConvexArea
+</th>
+<th style="text-align:right;">
+var.Extent
+</th>
+<th style="text-align:right;">
+var.Roundness
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+BOMBAY
+</td>
+<td style="text-align:right;">
+552697974
+</td>
+<td style="text-align:right;">
+32015.80
+</td>
+<td style="text-align:right;">
+3177.8992
+</td>
+<td style="text-align:right;">
+826.6840
+</td>
+<td style="text-align:right;">
+0.5472634
+</td>
+<td style="text-align:right;">
+259965
+</td>
+<td style="text-align:right;">
+0.8502428
+</td>
+<td style="text-align:right;">
+1.262811
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+CALI
+</td>
+<td style="text-align:right;">
+91528410
+</td>
+<td style="text-align:right;">
+26272.79
+</td>
+<td style="text-align:right;">
+1188.1780
+</td>
+<td style="text-align:right;">
+491.4581
+</td>
+<td style="text-align:right;">
+0.6183656
+</td>
+<td style="text-align:right;">
+117510
+</td>
+<td style="text-align:right;">
+0.8427527
+</td>
+<td style="text-align:right;">
+1.512446
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+DERMASON
+</td>
+<td style="text-align:right;">
+24651963
+</td>
+<td style="text-align:right;">
+22913.81
+</td>
+<td style="text-align:right;">
+696.7121
+</td>
+<td style="text-align:right;">
+498.7684
+</td>
+<td style="text-align:right;">
+0.5494947
+</td>
+<td style="text-align:right;">
+56174
+</td>
+<td style="text-align:right;">
+0.8471957
+</td>
+<td style="text-align:right;">
+2.055745
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+HOROZ
+</td>
+<td style="text-align:right;">
+56765885
+</td>
+<td style="text-align:right;">
+24960.58
+</td>
+<td style="text-align:right;">
+1252.4894
+</td>
+<td style="text-align:right;">
+456.5644
+</td>
+<td style="text-align:right;">
+0.7227374
+</td>
+<td style="text-align:right;">
+82462
+</td>
+<td style="text-align:right;">
+0.8420894
+</td>
+<td style="text-align:right;">
+1.620064
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+SEKER
+</td>
+<td style="text-align:right;">
+22567179
+</td>
+<td style="text-align:right;">
+24170.41
+</td>
+<td style="text-align:right;">
+736.8507
+</td>
+<td style="text-align:right;">
+419.4165
+</td>
+<td style="text-align:right;">
+0.3006355
+</td>
+<td style="text-align:right;">
+65674
+</td>
+<td style="text-align:right;">
+0.8183099
+</td>
+<td style="text-align:right;">
+1.990205
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+SIRA
+</td>
+<td style="text-align:right;">
+22641401
+</td>
+<td style="text-align:right;">
+23977.06
+</td>
+<td style="text-align:right;">
+782.4715
+</td>
+<td style="text-align:right;">
+401.8085
+</td>
+<td style="text-align:right;">
+0.6098838
+</td>
+<td style="text-align:right;">
+73945
+</td>
+<td style="text-align:right;">
+0.8418021
+</td>
+<td style="text-align:right;">
+1.718602
+</td>
+</tr>
+</tbody>
+</table>
+<p>The variance of each variable by class shows evidence of non-constant variance (Tables 5 &amp; 6). Based on the normality distribution and non-constant variance, we expect the QDA model to perform well.</p>
+<p><br />
+</p>
+</div>
+<div id="price-per-seed" class="section level3">
+<h3>Price per seed</h3>
+<p>Table 7 shows that Bombay has the highest grams and price per seed. The price per seed is the product of the price per pound and price per seed divided by the total weight of 453.592 grams.</p>
+<pre class="r"><code>classes &lt;- c(&quot;BOMBAY&quot;, &quot;CALI&quot;, &quot;DERMASON&quot;, &quot;HOROZ&quot;, &quot;SEKER&quot;, &quot;SIRA&quot;)
+price.per.1b &lt;- c(&quot;$5.56&quot;, &quot;$6.02&quot;, &quot;$1.98&quot;, &quot;$2.43&quot;, &quot;$2.72&quot;, &quot;$5.40&quot;)
+price.per.pound &lt;- c(5.56, 6.02, 1.98, 2.43, 2.72, 5.40)
+names(price.per.pound) &lt;- classes
+grams.per.seed &lt;- c(1.92, 0.61, 0.28, 0.52, 0.49, 0.38)
+names(grams.per.seed) &lt;- classes
+grams.per.pound &lt;- 453.592
+price.per.seed &lt;- round(((price.per.pound*grams.per.seed)/grams.per.pound),6)
+price.weight.data &lt;-  cbind(price.per.1b, grams.per.seed, price.per.seed)
+kable(price.weight.data, col.names=c(&quot;price per pound&quot;, &quot;grams per seed&quot;, &quot;price per seed&quot;), caption=&quot;distribution of types of dry beans and prices per seed&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table class="table" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+<span id="tab:unnamed-chunk-5">Table 3: </span>distribution of types of dry beans and prices per seed
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+</th>
+<th style="text-align:left;">
+price per pound
+</th>
+<th style="text-align:left;">
+grams per seed
+</th>
+<th style="text-align:left;">
+price per seed
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+BOMBAY
+</td>
+<td style="text-align:left;">
+$5.56
+</td>
+<td style="text-align:left;">
+1.92
+</td>
+<td style="text-align:left;">
+0.023535
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+CALI
+</td>
+<td style="text-align:left;">
+$6.02
+</td>
+<td style="text-align:left;">
+0.61
+</td>
+<td style="text-align:left;">
+0.008096
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+DERMASON
+</td>
+<td style="text-align:left;">
+$1.98
+</td>
+<td style="text-align:left;">
+0.28
+</td>
+<td style="text-align:left;">
+0.001222
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+HOROZ
+</td>
+<td style="text-align:left;">
+$2.43
+</td>
+<td style="text-align:left;">
+0.52
+</td>
+<td style="text-align:left;">
+0.002786
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+SEKER
+</td>
+<td style="text-align:left;">
+$2.72
+</td>
+<td style="text-align:left;">
+0.49
+</td>
+<td style="text-align:left;">
+0.002938
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+SIRA
+</td>
+<td style="text-align:left;">
+$5.40
+</td>
+<td style="text-align:left;">
+0.38
+</td>
+<td style="text-align:left;">
+0.004524
+</td>
+</tr>
+</tbody>
+</table>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="histogram-of-each-feature" class="section level2 tabset">
+<h2>Histogram of each feature</h2>
+<div id="histogram-of-each-feature---labeled-data" class="section level3">
+<h3>Histogram of each feature - Labeled Data</h3>
+<p>The histograms from the labeled data (Figure 1) show evidence of multimodality behavior in the variables. This means that at least one of the classes of beans is very distinct from the others. The multimodality behavior is also shown in the histograms from Sample A (Figure 2), but not from Sample B or C (Figures 3 &amp; 4). We expect to see very low predictions of BOMBAY for Sample B and C, because there is no multimodality behavior in their histograms.</p>
+<pre class="r"><code>grid.arrange(
+labeled%&gt;%ggplot() + geom_histogram(aes(x=Area), fill=&quot;light blue&quot;, col=&quot;brown&quot;)+ labs(title = &quot;Area&quot;),
+labeled%&gt;%ggplot() + geom_histogram(aes(x=Perimeter), fill=&quot;light blue&quot;, col=&quot;brown&quot;)+ labs(title = &quot;Perimeter&quot;),
+labeled%&gt;%ggplot() + geom_histogram(aes(x=MajorAxisLength), fill=&quot;light blue&quot;, col=&quot;brown&quot;)+ labs(title = &quot;MajorAxisLength&quot;),
+labeled%&gt;%ggplot() + geom_histogram(aes(x=MinorAxisLength), fill=&quot;light blue&quot;, col=&quot;brown&quot;)+ labs(title = &quot;MinorAxisLength&quot;),
+labeled%&gt;%ggplot() + geom_histogram(aes(x=ConvexArea), fill=&quot;light blue&quot;, col=&quot;brown&quot;)+ labs(title = &quot;ConvexArea&quot;),
+labeled%&gt;%ggplot() + geom_histogram(aes(x=Roundness), fill=&quot;light blue&quot;, col=&quot;brown&quot;)+ labs(title = &quot;Roundness&quot;),
+labeled%&gt;%ggplot() + geom_histogram(aes(x=Extent), fill=&quot;light blue&quot;, col=&quot;brown&quot;)+ labs(title = &quot;Extent&quot;),
+labeled%&gt;%ggplot() + geom_histogram(aes(x=Eccentricity), fill=&quot;light blue&quot;, col=&quot;brown&quot;)+ labs(title = &quot;Eccentricity&quot;),ncol=2)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-6"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-6-1.png" alt="Histograms" width="960"  />
+<p class="caption">
+Figure 1: Histograms
+</p>
+</div>
+<div style="page-break-after: always;"></div>
+</div>
+</div>
+<div id="boxplot-and-violin-plots-for-each-class" class="section level2">
+<h2>Boxplot and Violin plots for each class</h2>
+<p>The boxplots from the labeled data (Figure 5) show that BOMBAY and CALI beans are very distinct from the other beans. It can be seen from the boxplots that Roundness and Extent seems to be a strong predictor for the SEKER. Eccentricity seems to be a good predictor to HOROZ. The violin plots for each class (Figure 5) shows that most of the class distributions are approximately normal except for the distributions for Roundness and Extent. From these distributions, we expect BOMBAY and CALI to be easily predicted by our models.</p>
+<pre class="r"><code>library(gridExtra)
+grid.arrange(
+labeled%&gt;%group_by(Class)%&gt;%ggplot() + geom_boxplot(aes(x=Class, y=Area), col=&quot;brown&quot;)  + labs(title = &quot;Boxplot of class vs Area&quot;) + geom_violin(aes(x=Class, y=Area), alpha=0.4),
+labeled%&gt;%group_by(Class)%&gt;%ggplot() + geom_boxplot(aes(x=Class, y=Perimeter), col=&quot;brown&quot;) + labs(title = &quot;Boxplot of class vs Perimeter&quot;) + geom_violin(aes(x=Class, y=Perimeter), alpha=0.4),
+labeled%&gt;%group_by(Class)%&gt;%ggplot() + geom_boxplot(aes(x=Class, y=MajorAxisLength), col=&quot;brown&quot;) + labs(title = &quot;Boxplot of class vs MajorAxisLength&quot;) + geom_violin(aes(x=Class, y=MajorAxisLength), alpha=0.4),
+labeled%&gt;%group_by(Class)%&gt;%ggplot() + geom_boxplot(aes(x=Class, y=MinorAxisLength), col=&quot;brown&quot;) + labs(title = &quot;Boxplot of class vs MinorAxisLength&quot;) + geom_violin(aes(x=Class, y=MinorAxisLength), alpha=0.4),
+labeled%&gt;%group_by(Class)%&gt;%ggplot() + geom_boxplot(aes(x=Class, y=ConvexArea), col=&quot;brown&quot;) + labs(title = &quot;Boxplot of class vs ConvexArea&quot;) + geom_violin(aes(x=Class, y=ConvexArea), alpha=0.4),
+labeled%&gt;%group_by(Class)%&gt;%ggplot() + geom_boxplot(aes(x=Class, y=Roundness), col=&quot;brown&quot;) + labs(title = &quot;Boxplot of class vs Roundness&quot;) + geom_violin(aes(x=Class, y=Roundness), alpha=0.4),
+labeled%&gt;%group_by(Class)%&gt;%ggplot() + geom_boxplot(aes(x=Class, y=Extent), col=&quot;brown&quot;) + labs(title = &quot;Boxplot of class vs Extent&quot;) + geom_violin(aes(x=Class, y=Extent), alpha=0.4),
+labeled%&gt;%group_by(Class)%&gt;%ggplot() + geom_boxplot(aes(x=Class, y=Eccentricity), col=&quot;brown&quot;) + labs(title = &quot;Boxplot of class vs Eccentricity&quot;) +geom_violin(aes(x=Class, y=Eccentricity), alpha=0.4),ncol=2)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-7"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-7-1.png" alt="Boxplots and Voilin Polts of Variables by Classes" width="960"  />
+<p class="caption">
+Figure 2: Boxplots and Voilin Polts of Variables by Classes
+</p>
+</div>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="correlation-plot" class="section level2">
+<h2>Correlation Plot</h2>
+<p>Most of the variables except for Eccentricity, Extent, and Roundness, are highly correlated (Figure 6) in each dataset. This behavior is also seen in the correlation of the variables by classes (Figure 7). The principal component analysis (Figure 8) indicates that the first 3 principal components, which are new variables that are constructed as linear combinations or mixtures of the initial variables, explained more than 90% of all variance in the dataset.</p>
+<pre class="r"><code>par(mfrow =c(2,2))
+
+corrplot(cor(labeled%&gt;% dplyr::select(-Class)), method = &#39;ellipse&#39;, type = &quot;lower&quot;)
+
+corrplot(cor(sampA), method = &#39;ellipse&#39;, type = &quot;lower&quot;)
+
+corrplot(cor(sampB), method = &#39;ellipse&#39;, type = &quot;lower&quot;)
+
+corrplot(cor(sampC), method = &#39;ellipse&#39;, type = &quot;lower&quot;)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-8"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-8-1.png" alt="Correlation plot" width="672"  />
+<p class="caption">
+Figure 3: Correlation plot
+</p>
+</div>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="correlation-plot-by-class-for-labeled-dataset" class="section level2">
+<h2>Correlation plot by class for labeled dataset</h2>
+<pre class="r"><code>#labeled%&gt;%filter(Class==&quot;BOMBAY&quot;)%&gt;%ggcorr()
+
+par(mfrow=c(3,2))
+
+test &lt;- labeled%&gt;%filter(Class==&quot;BOMBAY&quot;)%&gt;% dplyr::select(-Class)
+corrplot(cor(test ), method = &#39;ellipse&#39;, type = &quot;lower&quot;)
+
+testb &lt;- labeled%&gt;%filter(Class==&quot;CALI&quot;)%&gt;% dplyr::select(-Class)
+corrplot(cor(testb), method = &#39;ellipse&#39;, type = &quot;lower&quot;)
+
+test &lt;- labeled%&gt;%filter(Class==&quot;DERMASON&quot;)%&gt;% dplyr::select(-Class)
+corrplot(cor(test), method = &#39;ellipse&#39;, type = &quot;lower&quot;)
+
+test &lt;- labeled%&gt;%filter(Class==&quot;SEKER&quot;)%&gt;% dplyr::select(-Class)
+corrplot(cor(test), method = &#39;ellipse&#39;, type = &quot;lower&quot;)
+
+test &lt;- labeled%&gt;%filter(Class==&quot;SIRA&quot;)%&gt;% dplyr::select(-Class)
+corrplot(cor(test), method = &#39;ellipse&#39;, type = &quot;lower&quot;)
+
+test &lt;- labeled%&gt;%filter(Class==&quot;HOROZ&quot;)%&gt;% dplyr::select(-Class)
+corrplot(cor(test), method = &#39;ellipse&#39;, type = &quot;lower&quot;)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-9"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-9-1.png" alt="correlation plot by class for labeled dataset" width="672"  />
+<p class="caption">
+Figure 4: correlation plot by class for labeled dataset
+</p>
+</div>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="principle-components-analysis" class="section level2">
+<h2>Principle components analysis</h2>
+<pre class="r"><code>#####pca#####
+pca.labeled &lt;- prcomp(labeled %&gt;% dplyr::select(-Class), scale = TRUE)
+pca.sampA &lt;- prcomp(sampA, scale = TRUE)
+pca.sampB &lt;- prcomp(sampB, scale = TRUE)
+pca.sampC &lt;- prcomp(sampC, scale = TRUE)</code></pre>
+<pre class="r"><code>#plot the variance explained by the first few principal components.
+par(mfrow = c(4,2))
+plot(pca.labeled, col=&quot;blue&quot;)
+plot(pca.sampA, col=&quot;blue&quot;)
+plot(pca.sampB, col=&quot;blue&quot;)
+plot(pca.sampC, col=&quot;blue&quot;)
+#plot the variance explained by the first few principal components.
+
+plot(cumsum(pca.labeled$sdev^2 / sum(pca.labeled$sdev^2)), 
+     xlab = &#39;PC&#39;, ylab = &#39;Cumm Var Exp&#39;, main = &#39;pca.labeled&#39;, col=&quot;blue&quot;)
+abline(h=0.9, col=&#39;red&#39;)
+plot(cumsum(pca.sampA$sdev^2 / sum(pca.sampA$sdev^2)), 
+     xlab = &#39;PC&#39;, ylab = &#39;Cumm Var Exp&#39;, main = &#39;pca.sampA&#39;, col=&quot;blue&quot;)
+abline(h=0.9, col=&#39;red&#39;)
+plot(cumsum(pca.sampB$sdev^2 / sum(pca.sampB$sdev^2)), 
+     xlab = &#39;PC&#39;, ylab = &#39;Cumm Var Exp&#39;, main = &#39;pca.sampB&#39;, col=&quot;blue&quot;)
+abline(h=0.9, col=&#39;red&#39;) 
+plot(cumsum(pca.sampC$sdev^2 / sum(pca.sampC$sdev^2)), 
+     xlab = &#39;PC&#39;, ylab = &#39;Cumm Var Exp&#39;, main = &#39;pca.sampC&#39;, col=&quot;blue&quot;)
+abline(h=0.9, col=&#39;red&#39;)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-11"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-11-1.png" alt="Variance explained by each components" width="672"  />
+<p class="caption">
+Figure 5: Variance explained by each components
+</p>
+</div>
+<div style="page-break-after: always;"></div>
+<pre class="r"><code>## Model performance function
+
+perf.measure &lt;- function(Preds, Truth){
+  Preds &lt;- as.character(Preds)
+  Truth &lt;- as.character(Truth)
+  CV.tab.dat &lt;- cbind(Preds, Truth)
+  conf.tab &lt;- xtabs(~Preds+Truth, CV.tab.dat)
+  #accuracy rate
+  accuracy.rate &lt;- round(mean(Preds==Truth),2)
+  #error rate
+  error.rate &lt;- round(1-accuracy.rate, 2)
+  #each Class
+  tp &lt;- c(conf.tab[1,1], conf.tab[2,2], conf.tab[3,3], 
+        conf.tab[4,4], conf.tab[5,5], conf.tab[6,6])
+  fp &lt;- apply(conf.tab, 1, sum) - tp
+  fn &lt;- apply(conf.tab, 2, sum) - tp
+  tn &lt;- sum(conf.tab) - tp - fn - fp
+  #precision (true positive among all predicted positive)
+  precision.Class &lt;- round(tp/(tp+fp),2)
+  precision.Avg &lt;- round(mean(tp/(tp+fp)),2)
+  #recall (percent of all positives are corrected predicted)
+  recall.Class &lt;- round(tp/(tp+fn),2)
+  recall.Avg &lt;- round(mean(tp/(tp+fn)),2)
+  #specificity (percent of all negatives are corrected predicted)
+  specificity.Class &lt;- round(tn/(tn+fp),2)
+  specificity.Avg &lt;- round(mean(tn/(tn+fp)),2)
+  #F1.score = 2*precision*recall / (precision+recall)
+  F1.score.Class &lt;- round((2* tp/(tp+fp)* tp/(tp+fn))/(tp/(tp+fp) + tp/(tp+fn)),2)
+  F1.score.Avg &lt;- round(mean((2* tp/(tp+fp)* tp/(tp+fn))/(tp/(tp+fp) + tp/(tp+fn))),2)
+  return(list(accuracy.rate = accuracy.rate, error.rate = error.rate, 
+              precision.Class = precision.Class, precision.Avg = precision.Avg, 
+              recall.Class = recall.Class, recall.Avg = recall.Avg, 
+              specificity.Class = specificity.Class, specificity.Avg = specificity.Avg, 
+              F1.score.Class = F1.score.Class, F1.score.Avg = F1.score.Avg,
+              conf.tab &lt;- conf.tab))
+}</code></pre>
+<pre class="r"><code>## Construct labled.sc dataset and pca dataset
+
+#construc scaled label data
+labeled.sc &lt;- as.data.frame(scale(labeled %&gt;% dplyr::select(-Class)))
+labeled.sc$Class &lt;- labeled$Class
+
+#construct pca label data
+labeled.pca &lt;- as.data.frame(pca.labeled$x)
+labeled.pca$Class &lt;- labeled$Class</code></pre>
+<pre class="r"><code>## Model validation (LOOCV)
+
+## LDA
+
+
+#fit lda and predict with CV (leave-one-out cross validation)
+lda.all &lt;- lda(Class~., data = labeled, CV = TRUE)
+lda.3var &lt;- lda(Class ~ Area + Eccentricity + Extent,
+                data = labeled, CV = TRUE)
+lda.4var &lt;- lda(Class ~ Area + Eccentricity + Extent + Roundness,
+                data = labeled, CV = TRUE)
+lda.3pca &lt;- lda(Class ~ PC1 + PC2 + PC3, 
+                data = labeled.pca, CV = TRUE)
+
+#lda CV performance
+lda.all.perf &lt;- perf.measure(Preds = lda.all$class, Truth = labeled$Class)
+lda.3var.perf &lt;- perf.measure(Preds = lda.3var$class, Truth = labeled$Class)
+lda.4var.perf &lt;- perf.measure(Preds = lda.4var$class, Truth = labeled$Class)
+lda.3pca.perf &lt;- perf.measure(Preds = lda.3pca$class, Truth = labeled$Class)</code></pre>
+<pre class="r"><code>## QDA
+
+#fit qda and predict with CV (leave-one-out cross validation)
+qda.all &lt;- qda(Class~., data = labeled, CV = TRUE)
+qda.3var &lt;- qda(Class ~ Area + Eccentricity + Extent,
+                data = labeled, CV = TRUE)
+qda.4var &lt;- qda(Class ~ Area + Eccentricity + Extent + Roundness,
+                data = labeled, CV = TRUE)
+qda.3pca &lt;- qda(Class ~ PC1 + PC2 + PC3, 
+                data = labeled.pca, CV = TRUE)
+
+#qda CV performance
+qda.all.perf &lt;- perf.measure(Preds = qda.all$class, Truth = labeled$Class)
+qda.3var.perf &lt;- perf.measure(Preds = qda.3var$class, Truth = labeled$Class)
+qda.4var.perf &lt;- perf.measure(Preds = qda.4var$class, Truth = labeled$Class)
+qda.3pca.perf &lt;- perf.measure(Preds = qda.3pca$class, Truth = labeled$Class)</code></pre>
+<pre class="r"><code>## Random Forest
+
+### find optimal mtry (No. of variables tried at each split). Test mtry with 1 to n with minimum error rate, n is number of independent variables.
+
+# all variables
+set.seed(12345)
+n &lt;- ncol(labeled) -1
+errRate &lt;- c(1)
+for (i in 1:n){  
+m &lt;- randomForest(Class~.,data=labeled,mtry=i,CV=TRUE)  
+err&lt;-mean(m$err.rate)  
+errRate[i] &lt;- err  
+}  
+a= which.min(errRate)  
+# my result is 2
+
+
+# three variables
+labeled.3var&lt;-labeled[,c(&quot;Area&quot;, &quot;Eccentricity&quot;, &quot;Extent&quot;, &quot;Class&quot;)]
+n &lt;- ncol(labeled.3var) -1
+errRate &lt;- c(1)
+for (i in 1:n){  
+m &lt;- randomForest(Class~.,data=labeled.3var,mtry=i,CV=TRUE)  
+err&lt;-mean(m$err.rate)  
+errRate[i] &lt;- err  
+}  
+b= which.min(errRate)  
+ # my result is 1
+
+
+# four variables
+labeled.4var&lt;-labeled[,c(&quot;Area&quot;, &quot;Eccentricity&quot;, &quot;Extent&quot;, &quot;Roundness&quot;, &quot;Class&quot;)]
+n &lt;- ncol(labeled.4var) -1
+errRate &lt;- c(1)
+for (i in 1:n){  
+m &lt;- randomForest(Class~.,data=labeled.4var,mtry=i,CV=TRUE)  
+err&lt;-mean(m$err.rate)  
+errRate[i] &lt;- err  
+}  
+c= which.min(errRate)  
+ # my result is 2
+
+
+# three pca
+labeled.3pca&lt;-labeled.pca[,c(&quot;PC1&quot;,&quot;PC2&quot;,&quot;PC3&quot;,&quot;Class&quot;)]
+n &lt;- ncol(labeled.3pca) -1
+errRate &lt;- c(1)
+for (i in 1:n){  
+m &lt;- randomForest(Class~.,data=labeled.3pca,mtry=i,CV=TRUE)  
+err&lt;-mean(m$err.rate)  
+errRate[i] &lt;- err  
+}  
+d= which.min(errRate)  
+# my result is 2
+
+# find optimal ntree(number of decision tree we want to create in our random forest). Fit random forest with optimal mtry and then plot number of decision tree and error rate, select number until we have straight error rate line in the plot.
+# The black solid line in the plot means Out-of-Bag error rate , the other dotted line means each class predicted error rate.
+# Acctually, we should use as many ntree as we can since lower ntree lead higher error rate for model, however, however higher ntree make model more complicated.
+
+par(mfrow=c(2,2))
+set.seed(12345)
+# all variables
+forest.all&lt;-randomForest(Class~., data = labeled, mtry=2) 
+plot(forest.all, main =&quot;random forest for all variables&quot;) #ntree=500
+
+# three variables
+forest.3var&lt;-randomForest(Class~., data = labeled.3var, mtry=1) 
+plot(forest.3var, main =&quot;random forest for three variables&quot;) # ntree=500
+
+# four variables
+forest.4var&lt;-randomForest(Class~., data = labeled.4var, mtry=2) 
+plot(forest.4var, main =&quot;random forest for four variables&quot;) # ntree=500
+
+# three pca
+forest.3pca&lt;-randomForest(Class~., data = labeled.3pca, mtry=2) 
+plot(forest.3pca, main =&quot;random forest for three pca&quot;) #ntree=500
+
+# Since we cannot get straight error rate line in each plot and error rate does not change a lot, we use default ntree = 500 in our model.
+
+rf.opt &lt;- cbind(rbind(a, b, c, d), rep(&quot;500&quot;, 5))
+rownames(rf.opt) &lt;- c(&quot;All variables&quot;, &quot;3 variables&quot;, &quot;4 variables&quot;, &quot;5 variables&quot;)
+kable(rf.opt, caption=&quot;Optimal parameters for Random forest model&quot;, col.names = c(&quot;Opt no of features&quot;, &quot;Opt no of trees&quot;), format = &quot;pandoc&quot;)</code></pre>
+<pre class="r"><code>## Random Forest
+
+set.seed(12345)
+#fit randomForest and predict with CV (leave-one-out cross validation)
+forest.all&lt;-randomForest(Class~., data = labeled,CV = TRUE, ntree=500,mtry=2) 
+forest.3var&lt;-randomForest(Class~Area + Eccentricity + Extent, data = labeled, CV = TRUE, ntree=500,mtry=1) 
+forest.4var&lt;-randomForest(Class~Area + Eccentricity + Extent + Roundness, data = labeled, CV = TRUE, ntree=500,mtry=2) 
+forest.3pca&lt;-randomForest(Class~PC1 + PC2 + PC3, data = labeled.pca, CV = TRUE,ntree=500,mtry=2) 
+
+#randomForest CV performance
+forest.all.perf &lt;- perf.measure(Preds = forest.all$predicted, Truth = labeled$Class)
+forest.3var.perf &lt;- perf.measure(Preds = forest.3var$predicted, Truth = labeled$Class)
+forest.4var.perf &lt;- perf.measure(Preds = forest.4var$predicted, Truth = labeled$Class)
+forest.3pca.perf &lt;- perf.measure(Preds = forest.3pca$predicted, Truth = labeled$Class)</code></pre>
+<pre class="r"><code>## KNN 
+
+
+set.seed(12345)
+AR.all &lt;- NULL
+for (k in 1:100) {
+test &lt;- knn.cv(labeled.sc[,1:8],cl=labeled$Class, k)
+AR.all[k] &lt;- mean(test==labeled.sc$Class)
+}
+k.all &lt;- which(AR.all==max(AR.all)) # my result is 15/17
+knn.all.sc &lt;- knn.cv(labeled.sc[,1:8],
+                     cl=labeled.sc$Class, k=k.all[1])
+###
+set.seed(12345)
+AR.3var &lt;- NULL
+for (k in 1:100) {
+test &lt;- knn.cv(labeled.sc[,c(&quot;Area&quot;, &quot;Eccentricity&quot;, &quot;Extent&quot;)],
+               cl=labeled.sc$Class, k)
+AR.3var[k] &lt;- mean(test==labeled.sc$Class)
+}
+k.3var=which(AR.3var==max(AR.3var)) # my result is 17
+knn.3var.sc &lt;- knn.cv(labeled.sc[,c(&quot;Area&quot;, &quot;Eccentricity&quot;, &quot;Extent&quot;)],
+                      cl=labeled.sc$Class, k=k.3var[1])
+####
+set.seed(12345)
+AR.4var &lt;- NULL
+for (k in 1:100) {
+test &lt;- knn.cv(labeled.sc[,c(&quot;Area&quot;, &quot;Eccentricity&quot;, &quot;Extent&quot;, &quot;Roundness&quot;)],
+               cl=labeled.sc$Class, k)
+AR.4var[k] &lt;- mean(test==labeled.sc$Class)
+}
+k.4var=which(AR.4var==max(AR.4var)) # my result is 15
+knn.4var.sc &lt;- knn.cv(labeled.sc[,c(&quot;Area&quot;, &quot;Eccentricity&quot;, &quot;Extent&quot;, &quot;Roundness&quot;)],
+                      cl=labeled.sc$Class, k=k.4var[1])
+###
+set.seed(12345)
+AR.3pca &lt;- NULL
+for (k in 1:100) {
+test &lt;- knn.cv(labeled.pca[,1:3],cl=labeled.pca$Class, k)
+AR.3pca[k] &lt;- mean(test==labeled.pca$Class)
+}
+k.3pca=which(AR.3pca==max(AR.3pca)) # my result is 18/19
+knn.3pca.sc &lt;- knn.cv(labeled.pca[,1:3],cl=labeled.pca$Class, k=k.3pca[1])</code></pre>
+<div style="page-break-after: always;"></div>
+<pre class="r"><code>#knn optimual parameters plot
+par(mfrow = c(2,2))
+plot(AR.all, ylim=c(0.8,0.9), xlab = &#39;k value&#39;, ylab = &#39;LOOCV accuracy rate&#39;, 
+     main = &#39;knn model with all variables&#39;)
+abline(v=k.all[1], col = &#39;red&#39;)
+legend(x=k.all[1], y=0.85, legend = paste(&#39;optimal k=&#39;,k.all[1]), bty=&#39;n&#39;)
+
+plot(AR.3var, ylim=c(0.8,0.9), xlab = &#39;k value&#39;, ylab = &#39;LOOCV accuracy rate&#39;, 
+     main = &#39;knn model with 3 variables&#39;)
+abline(v=k.3var[1], col = &#39;red&#39;)
+legend(x=k.3var[1], y=0.85, legend = paste(&#39;optimal k=&#39;,k.3var[1]), bty=&#39;n&#39;)
+
+plot(AR.4var, ylim=c(0.8,0.9), xlab = &#39;k value&#39;, ylab = &#39;LOOCV accuracy rate&#39;, 
+     main = &#39;knn model with 4 variables&#39;)
+abline(v=k.4var[1], col = &#39;red&#39;)
+legend(x=k.4var[1], y=0.88, legend = paste(&#39;optimal k=&#39;,k.4var[1]), bty=&#39;n&#39;)
+
+plot(AR.3pca, ylim=c(0.8,0.9), xlab = &#39;k value&#39;, ylab = &#39;LOOCV accuracy rate&#39;, 
+     main = &#39;knn model with first three pca variables&#39;)
+abline(v=k.3pca[1], col = &#39;red&#39;)
+legend(x=k.3pca[1], y=0.88, legend = paste(&#39;optimal k=&#39;,k.3pca[1]), bty=&#39;n&#39;)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-19"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-19-1.png" alt="optimal k value choices plots for knn model" width="672"  />
+<p class="caption">
+Figure 6: optimal k value choices plots for knn model
+</p>
+</div>
+<pre class="r"><code>#knn CV performance
+knn.all.sc.perf &lt;- perf.measure(Preds = knn.all.sc, Truth = labeled$Class)
+knn.3var.sc.perf &lt;- perf.measure(Preds = knn.3var.sc, Truth = labeled$Class)
+knn.4var.sc.perf &lt;- perf.measure(Preds = knn.4var.sc, Truth = labeled$Class)
+knn.3pca.perf &lt;- perf.measure(Preds = knn.3pca.sc, Truth = labeled$Class)</code></pre>
+<pre class="r"><code>## SVM
+## all variables
+set.seed(12345)
+svm_radial.all &lt;-  as.factor(NULL)
+levels(svm_radial.all) &lt;- levels(labeled$Class)
+for(i in 1:3000){
+  train &lt;- labeled[-i,]
+  test &lt;- labeled[i,]
+  mol &lt;- svm(Class ~., data = train, scale = TRUE, kernel = &#39;radial&#39;)
+  svm_radial.all[i] &lt;- predict(mol, newdata = test)
+}
+
+all&lt;-as.matrix(svm_radial.all)
+write.csv(all,file=&quot;svm_radial.all.csv&quot;)
+
+## three variables
+set.seed(12345)
+svm_radial.3var &lt;-  as.factor(NULL)
+levels(svm_radial.3var) &lt;- levels(labeled$Class)
+for(i in 1:3000){
+  train &lt;- labeled[-i,]
+  test &lt;- labeled[i,]
+  mol &lt;- svm(Class ~ Area + Eccentricity + Extent, data = train, scale = TRUE, kernel = &#39;radial&#39;)
+  svm_radial.3var[i] &lt;- predict(mol, newdata = test[,c(&quot;Area&quot;, &quot;Eccentricity&quot;, &quot;Extent&quot;)])
+}
+
+var3&lt;-as.matrix(svm_radial.3var)
+write.csv(var3,file=&quot;svm_radial.3var.csv&quot;)
+
+## four variables
+set.seed(12345)
+svm_radial.4var &lt;-  as.factor(NULL)
+levels(svm_radial.4var) &lt;- levels(labeled$Class)
+for(i in 1:3000){
+  train &lt;- labeled[-i,]
+  test &lt;- labeled[i,]
+  mol &lt;- svm(Class ~ Area + Eccentricity + Extent + Roundness, data = train, scale = TRUE, kernel = &#39;radial&#39;)
+  svm_radial.4var[i] &lt;- predict(mol, newdata = test[,c(&quot;Area&quot;, &quot;Eccentricity&quot;, &quot;Extent&quot;, &quot;Roundness&quot;)])
+}
+
+var4&lt;-as.matrix(svm_radial.4var)
+write.csv(var4,file=&quot;svm_radial.4var.csv&quot;)
+
+##3pca
+set.seed(12345)
+svm_radial.3pca &lt;-  as.factor(NULL)
+levels(svm_radial.3pca) &lt;- levels(labeled.pca$Class)
+for(i in 1:3000){
+  train &lt;- labeled.pca[-i,]
+  test &lt;- labeled.pca[i,]
+  mol &lt;- svm(Class ~ PC1 + PC2 + PC3, data = train, scale = FALSE, kernel = &#39;radial&#39;)
+  svm_radial.3pca[i] &lt;- predict(mol, newdata = test[,c(&quot;PC1&quot;, &quot;PC2&quot;, &quot;PC3&quot;)])
+}
+
+pca3&lt;-as.matrix(svm_radial.3pca)
+write.csv(pca3,file=&quot;svm_radial.3pca.csv&quot;)
+# Use scale = FALSE since pca data already be scaled data.</code></pre>
+<pre class="r"><code>## Because we do loocv svm mannually (write a loop), it takes a long time to run.
+## We decided to save loocv prediction result and reload here to save knitting time.
+svm_radial.all.sc &lt;- read.csv(&#39;svm_radial.all.csv&#39;)
+svm_radial.3var.sc &lt;- read.csv(&#39;svm_radial.3var.csv&#39;)
+svm_radial.4var.sc &lt;- read.csv(&#39;svm_radial.4var.csv&#39;)
+svm_radial.3pca.sc &lt;- read.csv(&#39;svm_radial.3pca.csv&#39;)
+
+svm.all.sc.perf &lt;- perf.measure(Preds = svm_radial.all.sc$V1, Truth = labeled$Class)
+svm.3var.sc.perf &lt;- perf.measure(Preds = svm_radial.3var.sc$V1, Truth = labeled$Class)
+svm.4var.sc.perf &lt;- perf.measure(Preds = svm_radial.4var.sc$V1, Truth = labeled$Class)
+svm.3pca.perf &lt;- perf.measure(Preds = svm_radial.3pca.sc$V1, Truth = labeled$Class)</code></pre>
+<div style="page-break-after: always;"></div>
+<pre class="r"><code>## construct performance table and plot
+
+COL.NAME &lt;- c(&#39;lda&#39;, &#39;qda&#39;, &#39;RandomForest&#39;, &#39;knn.sc&#39;,&#39;svm.sc&#39;)
+Row.NAME &lt;- c(&#39;all.var&#39;, &#39;3var&#39;, &#39;4var&#39;, &#39;3pca&#39;)
+
+accuracy.rate &lt;- as.data.frame(rbind(c(lda.all.perf$accuracy.rate, qda.all.perf$accuracy.rate, 
+                                       forest.all.perf$accuracy.rate,
+                                       knn.all.sc.perf$accuracy.rate,svm.all.sc.perf$accuracy.rate),
+                                     c(lda.3var.perf$accuracy.rate, qda.3var.perf$accuracy.rate,
+                                       forest.3var.perf$accuracy.rate,
+                                       knn.3var.sc.perf$accuracy.rate,svm.3var.sc.perf$accuracy.rate),
+                                     c(lda.4var.perf$accuracy.rate, qda.4var.perf$accuracy.rate,
+                                       forest.4var.perf$accuracy.rate,
+                                       knn.4var.sc.perf$accuracy.rate,svm.4var.sc.perf$accuracy.rate),
+                                     c(lda.3pca.perf$accuracy.rate, qda.3pca.perf$accuracy.rate,
+                                       forest.3pca.perf$accuracy.rate,
+                                       knn.3pca.perf$accuracy.rate,svm.3pca.perf$accuracy.rate)))
+
+colnames(accuracy.rate) &lt;- COL.NAME
+rownames(accuracy.rate) &lt;- Row.NAME
+
+
+#precision (true positive among all predicted positive)
+precision.Avg &lt;- as.data.frame(rbind(c(lda.all.perf$precision.Avg, qda.all.perf$precision.Avg, 
+                                       forest.all.perf$precision.Avg,
+                                       knn.all.sc.perf$precision.Avg,svm.all.sc.perf$precision.Avg),
+                                     c(lda.3var.perf$precision.Avg, qda.3var.perf$precision.Avg,
+                                       forest.3var.perf$precision.Avg,
+                                       knn.3var.sc.perf$precision.Avg,svm.3var.sc.perf$precision.Avg),
+                                     c(lda.4var.perf$precision.Avg, qda.4var.perf$precision.Avg,
+                                       forest.4var.perf$precision.Avg,
+                                       knn.4var.sc.perf$precision.Avg,svm.4var.sc.perf$precision.Avg),
+                                     c(lda.3pca.perf$precision.Avg, qda.3pca.perf$precision.Avg,
+                                       forest.3pca.perf$precision.Avg,
+                                       knn.3pca.perf$precision.Avg,svm.all.sc.perf$precision.Avg)))
+
+colnames(precision.Avg) &lt;- COL.NAME
+rownames(precision.Avg) &lt;- Row.NAME
+
+
+#recall (percent of all positives are corrected predicted)
+recall.Avg &lt;- as.data.frame(rbind(c(lda.all.perf$recall.Avg, qda.all.perf$recall.Avg, 
+                                       forest.all.perf$recall.Avg,
+                                       knn.all.sc.perf$recall.Avg,svm.all.sc.perf$recall.Avg),
+                                     c(lda.3var.perf$recall.Avg, qda.3var.perf$recall.Avg,
+                                       forest.3var.perf$recall.Avg,
+                                       knn.3var.sc.perf$recall.Avg,svm.3var.sc.perf$recall.Avg),
+                                     c(lda.4var.perf$recall.Avg, qda.4var.perf$recall.Avg,
+                                       forest.4var.perf$recall.Avg,
+                                       knn.4var.sc.perf$recall.Avg,svm.4var.sc.perf$recall.Avg),
+                                     c(lda.3pca.perf$recall.Avg, qda.3pca.perf$recall.Avg,
+                                       forest.3pca.perf$recall.Avg,
+                                       knn.3pca.perf$recall.Avg,svm.3pca.perf$recall.Avg)))
+
+colnames(recall.Avg) &lt;- COL.NAME
+rownames(recall.Avg) &lt;- Row.NAME
+
+
+#specificity (percent of all negatives are corrected predicted)
+specificity.Avg &lt;- as.data.frame(rbind(c(lda.all.perf$specificity.Avg, qda.all.perf$specificity.Avg, 
+                                       forest.all.perf$specificity.Avg,
+                                       knn.all.sc.perf$specificity.Avg,svm.all.sc.perf$specificity.Avg),
+                                     c(lda.3var.perf$specificity.Avg, qda.3var.perf$specificity.Avg,
+                                       forest.3var.perf$specificity.Avg,
+                                       knn.3var.sc.perf$specificity.Avg,svm.3var.sc.perf$specificity.Avg),
+                                     c(lda.4var.perf$specificity.Avg, qda.4var.perf$specificity.Avg,
+                                       forest.4var.perf$specificity.Avg,
+                                       knn.4var.sc.perf$specificity.Avg,svm.4var.sc.perf$specificity.Avg),
+                                     c(lda.3pca.perf$specificity.Avg, qda.3pca.perf$specificity.Avg,
+                                       forest.3pca.perf$specificity.Avg,
+                                       knn.3pca.perf$specificity.Avg,svm.3pca.perf$specificity.Avg)))
+colnames(specificity.Avg) &lt;- COL.NAME
+rownames(specificity.Avg) &lt;- Row.NAME
+
+
+#F1.score = 2*precision*recall / (precision+recall)
+F1.score.Avg &lt;- as.data.frame(rbind(c(lda.all.perf$F1.score.Avg, qda.all.perf$F1.score.Avg, 
+                                       forest.all.perf$F1.score.Avg,
+                                       knn.all.sc.perf$F1.score.Avg,svm.all.sc.perf$F1.score.Avg),
+                                     c(lda.3var.perf$F1.score.Avg, qda.3var.perf$F1.score.Avg,
+                                       forest.3var.perf$F1.score.Avg,
+                                       knn.3var.sc.perf$F1.score.Avg,svm.3var.sc.perf$F1.score.Avg),
+                                     c(lda.4var.perf$F1.score.Avg, qda.4var.perf$F1.score.Avg,
+                                       forest.4var.perf$F1.score.Avg,
+                                       knn.4var.sc.perf$F1.score.Avg,svm.4var.sc.perf$F1.score.Avg),
+                                     c(lda.3pca.perf$F1.score.Avg, qda.3pca.perf$F1.score.Avg,
+                                       forest.3pca.perf$F1.score.Avg,
+                                       knn.3pca.perf$F1.score.Avg,svm.3pca.perf$F1.score.Avg)))
+colnames(F1.score.Avg) &lt;- COL.NAME
+rownames(F1.score.Avg) &lt;- Row.NAME</code></pre>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="table-of-performance-measures" class="section level2">
+<h2>Table of Performance Measures</h2>
+<pre class="r"><code>#performance summary table
+kable(accuracy.rate, caption = &#39;Average LOOCV Accuracy Rate across Classes &#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-24">Table 4: </span>Average LOOCV Accuracy Rate across Classes</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">lda</th>
+<th align="right">qda</th>
+<th align="right">RandomForest</th>
+<th align="right">knn.sc</th>
+<th align="right">svm.sc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>all.var</td>
+<td align="right">0.86</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.88</td>
+<td align="right">0.90</td>
+</tr>
+<tr class="even">
+<td>3var</td>
+<td align="right">0.87</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.88</td>
+<td align="right">0.90</td>
+</tr>
+<tr class="odd">
+<td>4var</td>
+<td align="right">0.87</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.85</td>
+<td align="right">0.89</td>
+</tr>
+<tr class="even">
+<td>3pca</td>
+<td align="right">0.81</td>
+<td align="right">0.83</td>
+<td align="right">0.82</td>
+<td align="right">0.83</td>
+<td align="right">0.83</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>kable(precision.Avg, caption = &#39;Average LOOCV Precision across Classes &#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-24">Table 4: </span>Average LOOCV Precision across Classes</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">lda</th>
+<th align="right">qda</th>
+<th align="right">RandomForest</th>
+<th align="right">knn.sc</th>
+<th align="right">svm.sc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>all.var</td>
+<td align="right">0.87</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.89</td>
+<td align="right">0.90</td>
+</tr>
+<tr class="even">
+<td>3var</td>
+<td align="right">0.88</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.89</td>
+<td align="right">0.90</td>
+</tr>
+<tr class="odd">
+<td>4var</td>
+<td align="right">0.87</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.86</td>
+<td align="right">0.89</td>
+</tr>
+<tr class="even">
+<td>3pca</td>
+<td align="right">0.82</td>
+<td align="right">0.83</td>
+<td align="right">0.82</td>
+<td align="right">0.84</td>
+<td align="right">0.90</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>kable(recall.Avg, caption = &#39;Average LOOCV Recall across Classes &#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-24">Table 4: </span>Average LOOCV Recall across Classes</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">lda</th>
+<th align="right">qda</th>
+<th align="right">RandomForest</th>
+<th align="right">knn.sc</th>
+<th align="right">svm.sc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>all.var</td>
+<td align="right">0.86</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.88</td>
+<td align="right">0.90</td>
+</tr>
+<tr class="even">
+<td>3var</td>
+<td align="right">0.87</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.88</td>
+<td align="right">0.90</td>
+</tr>
+<tr class="odd">
+<td>4var</td>
+<td align="right">0.87</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.85</td>
+<td align="right">0.89</td>
+</tr>
+<tr class="even">
+<td>3pca</td>
+<td align="right">0.81</td>
+<td align="right">0.83</td>
+<td align="right">0.82</td>
+<td align="right">0.83</td>
+<td align="right">0.83</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>kable(specificity.Avg, caption = &#39;Average LOOCV Specificity across Classes &#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-24">Table 4: </span>Average LOOCV Specificity across Classes</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">lda</th>
+<th align="right">qda</th>
+<th align="right">RandomForest</th>
+<th align="right">knn.sc</th>
+<th align="right">svm.sc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>all.var</td>
+<td align="right">0.97</td>
+<td align="right">0.98</td>
+<td align="right">0.98</td>
+<td align="right">0.98</td>
+<td align="right">0.98</td>
+</tr>
+<tr class="even">
+<td>3var</td>
+<td align="right">0.97</td>
+<td align="right">0.98</td>
+<td align="right">0.98</td>
+<td align="right">0.98</td>
+<td align="right">0.98</td>
+</tr>
+<tr class="odd">
+<td>4var</td>
+<td align="right">0.97</td>
+<td align="right">0.98</td>
+<td align="right">0.98</td>
+<td align="right">0.97</td>
+<td align="right">0.98</td>
+</tr>
+<tr class="even">
+<td>3pca</td>
+<td align="right">0.96</td>
+<td align="right">0.97</td>
+<td align="right">0.96</td>
+<td align="right">0.97</td>
+<td align="right">0.97</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>kable(F1.score.Avg, caption = &#39;Average LOOCV F1.score across Classes &#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-24">Table 4: </span>Average LOOCV F1.score across Classes</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">lda</th>
+<th align="right">qda</th>
+<th align="right">RandomForest</th>
+<th align="right">knn.sc</th>
+<th align="right">svm.sc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>all.var</td>
+<td align="right">0.86</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.89</td>
+<td align="right">0.90</td>
+</tr>
+<tr class="even">
+<td>3var</td>
+<td align="right">0.88</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.88</td>
+<td align="right">0.90</td>
+</tr>
+<tr class="odd">
+<td>4var</td>
+<td align="right">0.87</td>
+<td align="right">0.90</td>
+<td align="right">0.90</td>
+<td align="right">0.85</td>
+<td align="right">0.89</td>
+</tr>
+<tr class="even">
+<td>3pca</td>
+<td align="right">0.81</td>
+<td align="right">0.83</td>
+<td align="right">0.82</td>
+<td align="right">0.84</td>
+<td align="right">0.84</td>
+</tr>
+</tbody>
+</table>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="graph-of-performance-measures" class="section level2">
+<h2>Graph of Performance measures</h2>
+<pre class="r"><code>accuracy.rate$numb.var &lt;- as.factor(c(&quot;all.var&quot;, &quot;3var&quot;, &quot;4var&quot;, &quot;3pca&quot;))
+mdata &lt;- melt(accuracy.rate, id=&quot;numb.var&quot;)%&gt;%dplyr::rename(Model=&quot;variable&quot;)
+
+
+a &lt;- ggplot(mdata, aes(x=numb.var, y=value, group=Model)) +
+  geom_line(aes(color=Model)) +
+  geom_point(aes(color=Model)) +
+  coord_cartesian(xlim = NULL, ylim = c(0.8,0.95), 
+                  expand = TRUE, default = FALSE,clip = &quot;on&quot;) + 
+  theme(legend.position=&quot;top&quot;) + labs(title = &quot;Accuracy rate&quot;) + 
+  xlab(&quot;Variable Selection&quot;) + ylab(&quot;LOOCV Accuracy rate&quot;) + 
+  guides(fill=guide_legend(title=&quot;Model&quot;))
+
+#precision.Avg
+
+precision.Avg$number.var &lt;- as.factor(c(&quot;all.var&quot;, &quot;3var&quot;, &quot;4var&quot;, &quot;3pca&quot;))
+
+prec.data &lt;- melt(precision.Avg, id=&quot;number.var&quot;)%&gt;%dplyr::rename(Model=&quot;variable&quot;)
+
+
+b &lt;- ggplot(prec.data, aes(x=number.var, y=value, group=Model)) +
+  geom_line(aes(color=Model))+
+  geom_point(aes(color=Model)) + coord_cartesian(xlim = NULL, ylim = c(0.8,0.95), 
+                  expand = TRUE, default = FALSE,clip = &quot;on&quot;) + 
+  theme(legend.position=&quot;top&quot;) + labs(title = &quot;Precision rate&quot;) + 
+  xlab(&quot;Variable Selection&quot;) + ylab(&quot;LOOCV Precisioin rate&quot;) + 
+  guides(fill=guide_legend(title=&quot;Model&quot;))
+
+
+#Recall
+
+recall.Avg$number.var &lt;- as.factor(c(&quot;all.var&quot;, &quot;3var&quot;, &quot;4var&quot;, &quot;3pca&quot;))
+
+rec.data &lt;- melt(recall.Avg, id=&quot;number.var&quot;)%&gt;%dplyr::rename(Model=&quot;variable&quot;)
+
+
+c &lt;- ggplot(rec.data, aes(x=number.var, y=value, group=Model)) +
+  geom_line(aes(color=Model))+
+  geom_point(aes(color=Model)) + coord_cartesian(xlim = NULL, ylim = c(0.8,0.95), 
+                  expand = TRUE, default = FALSE,clip = &quot;on&quot;) + 
+  theme(legend.position=&quot;top&quot;) + labs(title = &quot;Recall rate&quot;) + 
+  xlab(&quot;Variable Selection&quot;) + ylab(&quot;LOOCV Recall rate&quot;) + 
+  guides(fill=guide_legend(title=&quot;Model&quot;))
+
+#Specificity
+
+specificity.Avg$number.var &lt;- as.factor(c(&quot;all.var&quot;, &quot;3var&quot;, &quot;4var&quot;, &quot;3pca&quot;))
+
+spec.data &lt;- melt(specificity.Avg, id=&quot;number.var&quot;)%&gt;%dplyr::rename(Model=&quot;variable&quot;)
+
+
+d &lt;- ggplot(spec.data, aes(x=number.var, y=value, group=Model)) +
+  geom_line(aes(color=Model))+
+  geom_point(aes(color=Model)) + coord_cartesian(xlim = NULL, ylim = c(0.95, 1), 
+                  expand = TRUE, default = FALSE,clip = &quot;on&quot;) + 
+  theme(legend.position=&quot;top&quot;) + labs(title = &quot;Specificity rate&quot;) + 
+  xlab(&quot;Variable Selection&quot;) + ylab(&quot;LOOCV Specificity rate&quot;) + 
+  guides(fill=guide_legend(title=&quot;Model&quot;))
+
+#F1 scoore
+
+F1.score.Avg$number.var &lt;- as.factor(c(&quot;all.var&quot;, &quot;3var&quot;, &quot;4var&quot;, &quot;3pca&quot;))
+
+f.data &lt;- melt(F1.score.Avg, id=&quot;number.var&quot;)%&gt;%dplyr::rename(Model=&quot;variable&quot;)
+
+
+e &lt;- ggplot(f.data, aes(x=number.var, y=value, group=Model)) +
+  geom_line(aes(color=Model))+
+  geom_point(aes(color=Model)) + coord_cartesian(xlim = NULL, ylim = c(0.8, 0.95), 
+                  expand = TRUE, default = FALSE,clip = &quot;on&quot;) + 
+  theme(legend.position=&quot;top&quot;) + labs(title = &quot;F1 Score&quot;) + 
+  xlab(&quot;Variable Selection&quot;) + ylab(&quot;LOOCV F1 Score rate&quot;) + 
+  guides(fill=guide_legend(title=&quot;Model&quot;))
+
+grid.arrange(a,b,c,d,e,ncol=2)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-25"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-25-1.png" alt="Model Performance" width="864"  />
+<p class="caption">
+Figure 7: Model Performance
+</p>
+</div>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="visualize-best-selected-modelqda-with-all-variables" class="section level2">
+<h2>Visualize best-selected model:qda with all variables</h2>
+<pre class="r"><code>pred.label.dat &lt;- as.data.frame(cbind(&quot;Eccentricity&quot;=labeled$Eccentricity, &quot;Extent&quot;=labeled$Extent, &quot;class&quot;=qda.all$class))%&gt;%mutate(class=as.factor(ifelse(class==&quot;1&quot;, &quot;BOMBAY&quot;, ifelse(class==&quot;2&quot;,&quot;CALI&quot;, ifelse(class==&quot;3&quot;, &quot;DERMASON&quot;, ifelse(class==&quot;4&quot;, &quot;HOROZ&quot;, ifelse(class==&quot;5&quot;,&quot;SEKER&quot;, &quot;SIRA&quot; )))))))</code></pre>
+<pre class="r"><code>grid.arrange(
+ggplot(labeled)+geom_point(aes(x=Extent, y=Eccentricity,col=Class))+ labs(title = &quot;True Labeled&quot;)+ 
+  theme(legend.position=&quot;bottom&quot;),
+ggplot(pred.label.dat)+geom_point(aes(x=Extent, y=Eccentricity,col=class))+ labs(title = &quot;LOOCV qda Labeled&quot;) + theme(legend.position=&quot;bottom&quot;), ncol=2)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-27"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-27-1.png" alt="Final selected model (QDA)" width="864"  />
+<p class="caption">
+Figure 8: Final selected model (QDA)
+</p>
+</div>
+<p><br />
+</p>
+</div>
+<div id="classes-prediction-result" class="section level2">
+<h2>Classes prediction result</h2>
+<pre class="r"><code>#refit best-selected model
+qda.mol &lt;- qda(Class~., data = labeled, CV = FALSE)
+#prediction
+pred.A &lt;- predict(qda.mol, newdata=sampA)
+pred.B &lt;- predict(qda.mol, newdata=sampB)
+pred.C &lt;- predict(qda.mol, newdata=sampC)
+
+pred.dat &lt;- as.data.frame(rbind(table(pred.A$class), table(pred.B$class), table(pred.C$class)),
+                          row.names = c(&#39;sampleA&#39;, &#39;sampleB&#39;, &#39;sampleC&#39;))
+pred.dat$Num.obs. &lt;- c(sum(table(pred.A$class)), sum(table(pred.B$class)), sum(table(pred.C$class)))
+kable(pred.dat, caption = &#39;Prediction result for each sample&#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-28">Table 5: </span>Prediction result for each sample</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">BOMBAY</th>
+<th align="right">CALI</th>
+<th align="right">DERMASON</th>
+<th align="right">HOROZ</th>
+<th align="right">SEKER</th>
+<th align="right">SIRA</th>
+<th align="right">Num.obs.</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>sampleA</td>
+<td align="right">22</td>
+<td align="right">359</td>
+<td align="right">12</td>
+<td align="right">12</td>
+<td align="right">345</td>
+<td align="right">26</td>
+<td align="right">776</td>
+</tr>
+<tr class="even">
+<td>sampleB</td>
+<td align="right">0</td>
+<td align="right">1</td>
+<td align="right">779</td>
+<td align="right">15</td>
+<td align="right">238</td>
+<td align="right">340</td>
+<td align="right">1373</td>
+</tr>
+<tr class="odd">
+<td>sampleC</td>
+<td align="right">1</td>
+<td align="right">102</td>
+<td align="right">161</td>
+<td align="right">540</td>
+<td align="right">8</td>
+<td align="right">170</td>
+<td align="right">982</td>
+</tr>
+</tbody>
+</table>
+<div style="page-break-after: always;"></div>
+</div>
+<div id="visualize-classes-prediction" class="section level2">
+<h2>Visualize classes prediction</h2>
+<pre class="r"><code>pred.sampA.dat &lt;- as.data.frame(cbind(&quot;Eccentricity&quot;=sampA$Eccentricity, &quot;Extent&quot;=sampA$Extent, &quot;class&quot;=pred.A$class))%&gt;%mutate(class=as.factor(ifelse(class==&quot;1&quot;, &quot;BOMBAY&quot;, ifelse(class==&quot;2&quot;,&quot;CALI&quot;, ifelse(class==&quot;3&quot;, &quot;DERMASON&quot;, ifelse(class==&quot;4&quot;, &quot;HOROZ&quot;, ifelse(class==&quot;5&quot;,&quot;SEKER&quot;, &quot;SIRA&quot; )))))))
+
+pred.sampB.dat &lt;- as.data.frame(cbind(&quot;Eccentricity&quot;=sampB$Eccentricity, &quot;Extent&quot;=sampB$Extent, &quot;class&quot;=pred.B$class))%&gt;%mutate(class=as.factor(ifelse(class==&quot;1&quot;, &quot;BOMBAY&quot;, ifelse(class==&quot;2&quot;,&quot;CALI&quot;, ifelse(class==&quot;3&quot;, &quot;DERMASON&quot;, ifelse(class==&quot;4&quot;, &quot;HOROZ&quot;, ifelse(class==&quot;5&quot;,&quot;SEKER&quot;, &quot;SIRA&quot; )))))))
+
+pred.sampC.dat &lt;- as.data.frame(cbind(&quot;Eccentricity&quot;=sampC$Eccentricity, &quot;Extent&quot;=sampC$Extent, &quot;class&quot;=pred.C$class))%&gt;%mutate(class=as.factor(ifelse(class==&quot;1&quot;, &quot;BOMBAY&quot;, ifelse(class==&quot;2&quot;,&quot;CALI&quot;, ifelse(class==&quot;3&quot;, &quot;DERMASON&quot;, ifelse(class==&quot;4&quot;, &quot;HOROZ&quot;, ifelse(class==&quot;5&quot;,&quot;SEKER&quot;, &quot;SIRA&quot; )))))))</code></pre>
+<pre class="r"><code>grid.arrange(
+ggplot(labeled)+geom_point(aes(x=Extent, y=Eccentricity,col=Class))+ labs(title = &quot;True Labeled&quot;)+ theme(legend.position=&quot;bottom&quot;),
+
+ggplot(pred.sampA.dat)+geom_point(aes(x=Extent, y=Eccentricity,col=class))+ labs(title = &quot;Labeled.True&quot;) + theme(legend.position=&quot;bottom&quot;),
+
+ggplot(pred.sampB.dat)+geom_point(aes(x=Extent, y=Eccentricity,col=class))+ labs(title = &quot;Sample B.Preds&quot;) + theme(legend.position=&quot;bottom&quot;),
+
+ggplot(pred.sampC.dat)+geom_point(aes(x=Extent, y=Eccentricity,col=class))+ labs(title = &quot;Sample C.Preds&quot;) + theme(legend.position=&quot;bottom&quot;),ncol=2)</code></pre>
+<div class="figure" style="text-align: center"><span style="display:block;" id="fig:unnamed-chunk-30"></span>
+<img src="/posts/Final Project/STAT_602_FINAL_GROUP%2011%20-%203_files/figure-html/unnamed-chunk-30-1.png" alt="Prediction Visualization" width="864"  />
+<p class="caption">
+Figure 9: Prediction Visualization
+</p>
+</div>
+<div style="page-break-after: always;"></div>
+<pre class="r"><code>## Price Prediction Result and Accuracy 
+
+p.lbs.sampA &lt;- as.numeric(t(table(pred.A$class))%*%price.per.seed)
+p.lbs.sampB &lt;- as.numeric(t(table(pred.B$class))%*%price.per.seed)
+p.lbs.sampC &lt;- as.numeric(t(table(pred.C$class))%*%price.per.seed)</code></pre>
+</div>
+<div id="confusion-matrix-of-label-data-with-loocv-qda" class="section level2">
+<h2>Confusion matrix of label data with LOOCV QDA</h2>
+<pre class="r"><code>#second method
+CV.tab.dat=cbind(Preds=qda.all$class,
+                 Truth=labeled$Class)
+
+conf.tab=xtabs(~Preds+Truth, CV.tab.dat)
+
+#matrix(rowSums(conf.tab), nrow = 6, ncol = 6)
+
+pred.tab.A=conf.probs=conf.tab/
+             matrix(rowSums(conf.tab), nrow = 6, ncol = 6)
+
+rownames(conf.tab) &lt;- paste(&#39;Pred&#39;, classes, sep = &#39;.&#39;)
+colnames(conf.tab) &lt;- paste(&#39;True&#39;, classes, sep = &#39;.&#39;)
+kable(conf.tab, caption = &#39;Confusion matrix of label data with LOOCV QDA (all variables)&#39;, format = &quot;pandoc&quot;) %&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-32">Table 6: </span>Confusion matrix of label data with LOOCV QDA (all variables)</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">True.BOMBAY</th>
+<th align="right">True.CALI</th>
+<th align="right">True.DERMASON</th>
+<th align="right">True.HOROZ</th>
+<th align="right">True.SEKER</th>
+<th align="right">True.SIRA</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Pred.BOMBAY</td>
+<td align="right">500</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr class="even">
+<td>Pred.CALI</td>
+<td align="right">0</td>
+<td align="right">479</td>
+<td align="right">0</td>
+<td align="right">19</td>
+<td align="right">1</td>
+<td align="right">2</td>
+</tr>
+<tr class="odd">
+<td>Pred.DERMASON</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">416</td>
+<td align="right">6</td>
+<td align="right">13</td>
+<td align="right">38</td>
+</tr>
+<tr class="even">
+<td>Pred.HOROZ</td>
+<td align="right">0</td>
+<td align="right">16</td>
+<td align="right">3</td>
+<td align="right">449</td>
+<td align="right">0</td>
+<td align="right">36</td>
+</tr>
+<tr class="odd">
+<td>Pred.SEKER</td>
+<td align="right">0</td>
+<td align="right">2</td>
+<td align="right">16</td>
+<td align="right">0</td>
+<td align="right">454</td>
+<td align="right">24</td>
+</tr>
+<tr class="even">
+<td>Pred.SIRA</td>
+<td align="right">0</td>
+<td align="right">3</td>
+<td align="right">65</td>
+<td align="right">26</td>
+<td align="right">32</td>
+<td align="right">400</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>kable(rowSums(conf.tab), col.names = &#39;Num.Preds&#39;, caption = &#39;rowsums of confusion matrix&#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-32">Table 6: </span>rowsums of confusion matrix</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">Num.Preds</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Pred.BOMBAY</td>
+<td align="right">500</td>
+</tr>
+<tr class="even">
+<td>Pred.CALI</td>
+<td align="right">501</td>
+</tr>
+<tr class="odd">
+<td>Pred.DERMASON</td>
+<td align="right">473</td>
+</tr>
+<tr class="even">
+<td>Pred.HOROZ</td>
+<td align="right">504</td>
+</tr>
+<tr class="odd">
+<td>Pred.SEKER</td>
+<td align="right">496</td>
+</tr>
+<tr class="even">
+<td>Pred.SIRA</td>
+<td align="right">526</td>
+</tr>
+</tbody>
+</table>
+<p><br />
+</p>
+<pre class="r"><code>rownames(pred.tab.A) &lt;- paste(&#39;Pred&#39;, classes, sep = &#39;.&#39;)
+colnames(pred.tab.A) &lt;- paste(&#39;True&#39;, classes, sep = &#39;.&#39;)
+kable(pred.tab.A, caption = &#39;multinominal distribution estimation&#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-33">Table 7: </span>multinominal distribution estimation</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">True.BOMBAY</th>
+<th align="right">True.CALI</th>
+<th align="right">True.DERMASON</th>
+<th align="right">True.HOROZ</th>
+<th align="right">True.SEKER</th>
+<th align="right">True.SIRA</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Pred.BOMBAY</td>
+<td align="right">1</td>
+<td align="right">0.0000000</td>
+<td align="right">0.0000000</td>
+<td align="right">0.0000000</td>
+<td align="right">0.0000000</td>
+<td align="right">0.0000000</td>
+</tr>
+<tr class="even">
+<td>Pred.CALI</td>
+<td align="right">0</td>
+<td align="right">0.9560878</td>
+<td align="right">0.0000000</td>
+<td align="right">0.0379242</td>
+<td align="right">0.0019960</td>
+<td align="right">0.0039920</td>
+</tr>
+<tr class="odd">
+<td>Pred.DERMASON</td>
+<td align="right">0</td>
+<td align="right">0.0000000</td>
+<td align="right">0.8794926</td>
+<td align="right">0.0126850</td>
+<td align="right">0.0274841</td>
+<td align="right">0.0803383</td>
+</tr>
+<tr class="even">
+<td>Pred.HOROZ</td>
+<td align="right">0</td>
+<td align="right">0.0317460</td>
+<td align="right">0.0059524</td>
+<td align="right">0.8908730</td>
+<td align="right">0.0000000</td>
+<td align="right">0.0714286</td>
+</tr>
+<tr class="odd">
+<td>Pred.SEKER</td>
+<td align="right">0</td>
+<td align="right">0.0040323</td>
+<td align="right">0.0322581</td>
+<td align="right">0.0000000</td>
+<td align="right">0.9153226</td>
+<td align="right">0.0483871</td>
+</tr>
+<tr class="even">
+<td>Pred.SIRA</td>
+<td align="right">0</td>
+<td align="right">0.0057034</td>
+<td align="right">0.1235741</td>
+<td align="right">0.0494297</td>
+<td align="right">0.0608365</td>
+<td align="right">0.7604563</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="prediction-result-and-accuracy" class="section level2">
+<h2>Prediction result and accuracy</h2>
+<pre class="r"><code>set.seed(12345)
+pred.accuracy &lt;- function(pred.tab.A, size.tab){
+condit.Par.BS=NULL
+for (i in 1:1000){
+  p.lbs &lt;- NULL
+  for (j in 1:6) {
+    seed &lt;- t(rmultinom(1, size = size.tab[j], prob = pred.tab.A[j,]))
+    p.lbs &lt;- c(p.lbs, seed %*% price.per.seed)
+  }
+condit.Par.BS=c(condit.Par.BS, sum(p.lbs))
+}
+return(condit.Par.BS)
+}
+
+pred.ar.A &lt;- pred.accuracy(pred.tab.A = pred.tab.A, size.tab = table(pred.A$class))
+pred.ar.B &lt;- pred.accuracy(pred.tab.A = pred.tab.A, size.tab = table(pred.B$class))
+pred.ar.C &lt;- pred.accuracy(pred.tab.A = pred.tab.A, size.tab = table(pred.C$class))
+
+
+pred.ar.dat &lt;- rbind(quantile(pred.ar.A, c(0, 0.025, 0.975, 1)),
+                     quantile(pred.ar.B, c(0, 0.025, 0.975, 1)),
+                     quantile(pred.ar.C, c(0, 0.025, 0.975, 1)))
+pred.ar.dat &lt;- as.data.frame(pred.ar.dat)
+rownames(pred.ar.dat) &lt;- c(&#39;samp.A&#39;, &#39;samp.B&#39;, &#39;samp.C&#39;)
+
+pred.ar.dat$Predicted.Net.Worth &lt;- c(p.lbs.sampA, p.lbs.sampB, p.lbs.sampC)
+pred.ar.dat$Range &lt;- pred.ar.dat$`97.5%` - pred.ar.dat$`2.5%`
+
+
+kable(round(pred.ar.dat,2), caption = &#39;prediction result and accuracy (in dollars)&#39;, format = &quot;pandoc&quot;)%&gt;%kable_styling(latex_option=c(&quot;hold_position&quot;), full_width = F)</code></pre>
+<table>
+<caption><span id="tab:unnamed-chunk-34">Table 8: </span>prediction result and accuracy (in dollars)</caption>
+<thead>
+<tr class="header">
+<th></th>
+<th align="right">0%</th>
+<th align="right">2.5%</th>
+<th align="right">97.5%</th>
+<th align="right">100%</th>
+<th align="right">Predicted.Net.Worth</th>
+<th align="right">Range</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>samp.A</td>
+<td align="right">4.45</td>
+<td align="right">4.48</td>
+<td align="right">4.57</td>
+<td align="right">4.59</td>
+<td align="right">4.60</td>
+<td align="right">0.09</td>
+</tr>
+<tr class="even">
+<td>samp.B</td>
+<td align="right">3.22</td>
+<td align="right">3.25</td>
+<td align="right">3.39</td>
+<td align="right">3.44</td>
+<td align="right">3.24</td>
+<td align="right">0.14</td>
+</tr>
+<tr class="odd">
+<td>samp.C</td>
+<td align="right">3.35</td>
+<td align="right">3.37</td>
+<td align="right">3.49</td>
+<td align="right">3.55</td>
+<td align="right">3.34</td>
+<td align="right">0.13</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>library(MASS)
+qda.mod=qda(Class~., labeled)
+preds.C= predict(qda.mod, newdata = sampC)
+pred.tabs=table(pred.C$class)
+for(i in 1:10){
+  qda.mod.iter=qda(Class~., prior = as.vector(pred.tabs/sum(pred.tabs)), labeled)
+  preds.C= predict(qda.mod.iter, newdata = sampC)
+  pred.tabs=table(pred.C$class)
+  print(pred.tabs)
+  flush.console()
+}</code></pre>
+<pre><code>## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170 
+## 
+##   BOMBAY     CALI DERMASON    HOROZ    SEKER     SIRA 
+##        1      102      161      540        8      170</code></pre>
+<div style="page-break-after: always;"></div>
+</div>
+</div>
+<div id="references" class="section level1">
+<h1>References</h1>
+<ol style="list-style-type: decimal">
+<li><p>James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2013). An introduction to statistical learning (Vol. 112, p. 18). New York: springer.</p></li>
+<li><p>Heuzé V., Tran G., Nozière P., &amp; Lebas F. (2015). Common Bean (Phaseolus vulgaris), Feedipedia.org – Animal Feed Resources Information System – A programme by INRA, CIRAD, AFZ and FAO, <a href="http://www.feedipedia.org/node/266" class="uri">http://www.feedipedia.org/node/266</a> (accessed on 29 April 2021).</p></li>
+<li><p>Koklu, M., &amp; Ozkan, I. A. (2020). Multiclass classification of dry beans using computer vision and ma-chine learning techniques. Computers and Electronics in Agriculture, 174, 105507. <a href="doi:10.1016/j.compag.2020.105507" class="uri">doi:10.1016/j.compag.2020.105507</a></p></li>
+<li><p>Varankaya, S., &amp; Ceyhan, E. (2012). Problems Encountered in Bean Farming in the Central Anatolia Region and Solution Suggestions. Selçuk Tarım Bilim. Journal. 26, 15–26.</p></li>
+<li><p><a href="https://en.m.wikipedia.org/wiki/Sensitivity_and_specificity" class="uri">https://en.m.wikipedia.org/wiki/Sensitivity_and_specificity</a></p></li>
+<li><p><a href="https://www.geeksforgeeks.org/loocvleave-one-out-cross-validation-in-r-programming/" class="uri">https://www.geeksforgeeks.org/loocvleave-one-out-cross-validation-in-r-programming/</a></p></li>
+<li><p><a href="https://towardsdatascience.com/what-is-out-of-bag-oob-score-in-random-forest-a7fa23d710" class="uri">https://towardsdatascience.com/what-is-out-of-bag-oob-score-in-random-forest-a7fa23d710</a></p></li>
+<li><p><a href="https://alekhyo.medium.com/interview-questions-on-svm-bf13e5fbcca8://alekhyo.medium.com/interview-questions-on-svm-bf13e5fbcca8" class="uri">https://alekhyo.medium.com/interview-questions-on-svm-bf13e5fbcca8://alekhyo.medium.com/interview-questions-on-svm-bf13e5fbcca8</a></p></li>
+</ol>
+</div>
