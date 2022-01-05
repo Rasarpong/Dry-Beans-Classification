@@ -68,6 +68,7 @@ dup.rows = sum(labeled%>%duplicated(), sampA%>%duplicated(),
                sampB%>%duplicated(),sampC%>%duplicated())
 ```
 
+![Photo Credits: nitsuki](/Users/kwabenasarpong/OneDrive/Projects/Dry-Beans-Classification/featured.webp)
 
 ## Aim of the Project
 
