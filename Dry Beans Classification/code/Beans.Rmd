@@ -69,22 +69,20 @@ dup.rows = sum(labeled%>%duplicated(), sampA%>%duplicated(),
 ```
 
 
-## Introduction and Problem Statement
-
-Dry bean- Phaseolus vulgaris L. is a major cultivated grain species in the genus Phaseolus that is widely consumed worldwide for its edible legume and pea pods (Heuze et al., 2015). Nevertheless, **selecting the best seed species is one of the main concerns for both bean producers and the market**. Since different genotypes are cultivated worldwide, it is important to separate the best seed variety from the mixed dry bean population, otherwise the market value of these mixed species of beans could drop enormously (Varankaya & Ceyhan, 2012). For more information on background problem and data, please refer to the associated article "Koklu, M., & Ozkan, I. A. (2020). Multiclass classification of dry beans using computer vision and ma-chine learning techniques. Computers and Electronics in Agriculture, 174, 105507." 
-
-
 ## Aim of the Project
-**The aim of this project is to develop a machine learning method to perform a multi-classification of dry beans that could predict the net worth of a given bean species harvested from a 'population cultivation' from a single farm when presented in the market.**
+
+**selecting the best seed species is one of the main concerns for both bean producers and the market**. Since different genotypes are cultivated worldwide, it is important to separate the best seed variety from the mixed dry bean population, otherwise the market value of these mixed species of beans could drop enormously (Varankaya & Ceyhan, 2012). 
+
+**The aim of this project is to develop a supervised machine learning algorithm to perform a multi-classification of dry beans species harvested from population cultivation from a single farm.** A supervised machine learning algorithm is one that relies on labeled input data to learn a function that produces an appropriate output when given new unlabeled data
 
 
 ## Exploratory Data Analysis
 
-There are two datasets used in this project; The 'labeled' and 'unlabeled' datasets. The labeled dataset will be used to train the various ML models, hence also refered to as the training dataset. The training dataset contains 3000 observations and 8 variables. The dependent variable has 6 levels (Classes): BOMBAY, CALI, DERMASON, HOROZ, SEKER, and SIRA - These classes represent the different varieties of dry beans. In the training set, each class  has 500 observations. 
+There are two datasets used in this project; The 'labeled' and 'unlabeled' dataset. The labeled dataset- which contains the classes of dry-beans will be used to train the various ML models, hence also refered to as the training dataset. The training dataset contains 3000 observations and 8 variables. The dependent variable has 6 levels (Classes): BOMBAY, CALI, DERMASON, HOROZ, SEKER, and SIRA - These classes represent the different varieties of dry beans. In the training set, each class  has 500 observations. 
 
-The unlabeled dataset is made up of three seperate samples, namely, Sample A, B, and C. these samples have 7 variables (excluding the dependent variable(Class) -thus unlabeled).  The total observations for sample A, B, and C are 777, 1373, and 982 respectively. Roundness, which is the measure of how closely the shape of beans approaches a perfect circle, was calculated and added as an additional predictor variable to both labeled and unlabeled datasets (Koklu & Ozkan, 2020). Tables 1 through 4 show the summary statistics of the variables in the labeled data, Sample A,  B, and C, respectively .
+The unlabeled dataset is made up of the combination of three seperate samples, namely, Sample A, B, and C. There are 7 variables which does not include the Class variable -thus unlabeled.  The total observations for is 3131 respectively. Roundness, which is the measure of how closely the shape of beans approaches a perfect circle, is calculated and added as an additional predictor variable to both labeled and unlabeled datasets (Koklu & Ozkan, 2020). Below is the summary statistics of the variables in the training(labeled) data.
 
-### Summary
+#### Summary of Data
 
 ```{r, warning=F, message=F}
 summary.stats <- round(as.data.frame((labeled[,-9])%>%
@@ -95,22 +93,23 @@ kbl(summary.stats, caption="Statistical distribution of features of dry beans va
   kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 ```
 
-The variables, Area and Convex Area, had the largest range for all four datasets. There are large differences in the range of variables, the variables with larger ranges will dominate over those with small ranges which may lead to biased results, therefore it is necessary to transform/scale these variables before fitting our distance-based models (i.e., KNN and SVM). 
+The variables, Area and Convex Area, had the largest range for all four datasets. There are large differences in the range of variables, the variables with larger ranges can dominate over those with small ranges which may lead to biased results, therefore it is necessary to transform/scale these variables before fitting distance-based models such as **K-Nearest Neighbors and SVM)**. 
 
 
 
-### Variance check
+### Class Covariances
 
-The variance of each variable by class shows evidence of non-constant variance (Tables 5 & 6). Based on the normality distribution and non-constant variance, we expect the QDA model to perform well.
+Below is the class variances which measures variability from the average or mean.The variance of each variable by class shows evidence of non-constant variance. Based on the normality distribution and non-constant variance evident in the data, I expect the models which assumes distinct covariances among classes such as the Quadratic Discriminant Analysis(**QDA**) model to perform well.
 
 ```{r, warning= FALSE, message=FALSE}
 var.tab1 <- labeled%>%group_by(Class)%>%
-  summarize(Var.Area=var(Area),Var.Perimeter=var(Perimeter), var.Maj.Axis.=var(MajorAxisLength),var.Min.Axis.=var(MinorAxisLength), 
-            var.Eccentricity=min(Eccentricity), var.ConvexArea=max(ConvexArea), 
-            var.Extent=max(Extent), var.Roundness=max(Roundness))
+  summarize(Area=var(Area),Perimeter=var(Perimeter),
+            Maj.Axis.=var(MajorAxisLength),Min.Axis.=var(MinorAxisLength), 
+            Eccentricity=min(Eccentricity), var.ConvexArea=max(ConvexArea), 
+            Extent=max(Extent), Roundness=max(Roundness))
 
 
-kbl(var.tab1, caption = "Variance of distribution")%>%
+kbl(var.tab1, caption = "Variance of Variable by Class")%>%
   kable_classic(full_width = F, html_font = "Cambria", font_size = 12)
 ```
 
@@ -121,24 +120,18 @@ kbl(var.tab1, caption = "Variance of distribution")%>%
 The  histograms from the labeled data (Figure 1) show evidence of multimodality behavior in the variables. This means that at least one of the classes of beans is very distinct from the others. Upon further checks I found that this multimodality is caused by the **BOMBAY** beans type.Upon further checks, I found that this multimodality is caused by the **BOMBAY** beans type in both the labeled set and Sample A, but not in Sample B and C. This multi,odality behaviour implies that, they might be very low predictions of BOMBAY for Sample B and C.
 
 
-
-The violin plots from the labeled data show that BOMBAY and CALI beans are very distinct from the other beans. It can be seen from the average points that Roundness and Extent seems to be a strong predictor for the SEKER. Eccentricity seems to be a good predictor to HOROZ. The violin plots for each class (Figure 5) shows that most of the class distributions are approximately normal except for the distributions for Roundness and Extent. From these distributions, we expect BOMBAY and CALI to be easily predicted by our models.   
-
-
-
 ```{r, fig.dim=c(7,4), fig.height=7}
 
 theme_set(theme_classic())
 
 a <- labeled%>%ggplot() + 
   geom_histogram(aes(x=Area/1000), fill="brown", col="white") + 
-  labs(title = "Histogram  of Area") + xlab("Area(in 1000s)")# + ggeasy::easy_center_title()
+  labs(title = "Histogram  of Area") + xlab("Area(in 1000s)") + ggeasy::easy_center_title()
     
 b <- labeled%>%ggplot() + 
   stat_summary(aes(x=Class, y=Area/10000), col="brown")  + 
   labs(title = "Boxplot of class vs Area") + 
-  geom_violin(aes(x=Class, y=Area/10000), alpha=0.4) + ylab("Area")
-  #ggeasy::easy_center_title()
+  geom_violin(aes(x=Class, y=Area/10000), alpha=0.4) + ylab("Area") + ggeasy::easy_center_title()
 
 
 c <- labeled%>%ggplot() +
@@ -201,11 +194,13 @@ ggsave(filename = "explo1.png",
 
 
 ![Figure 1: Exploratory Analysis of Labeled Data Set](/Users/kwabenasarpong/OneDrive/Projects/Dry-Beans-Classification/Dry Beans Classification/code/explo1.png)
+The violin plots from the labeled data show that BOMBAY and CALI beans are very distinct from the other beans. It can be seen from the average points that Roundness and Extent seems to be a strong predictor for the SEKER. Eccentricity seems to be a good predictor to HOROZ. The violin plots for each class shows that most of the class distributions are approximately normal except for the distributions for Roundness and Extent. From these distributions, we expect BOMBAY and CALI to be easily predicted by our models. 
+
 
 
 ### Correlation of Variables
 
-Most of the variables except for Eccentricity, Extent, and Roundness, are highly correlated (Figure 6) in each dataset. This behavior is also seen in the correlation of the variables by classes (Figure 7). 
+Most of the variables except for Eccentricity, Extent, and Roundness, are highly correlated with each other. This behavior is also seen in the correlation of the variables by classes (diagram not shown). 
 
 
 ```{r, fig.cap='Correlation plot'}
@@ -221,9 +216,9 @@ corrplot(cor(labeled%>% dplyr::select(-Class)), method = 'ellipse', type = "lowe
 ```
 
 
-## Principle Components Analysis 
-
-The principal component analysis (Figure 8) indicates that the first 3 principal components, which are new variables that are constructed as linear combinations or mixtures of the initial variables, explained more than 90% of all variance in the dataset.
+## Principle Components Analysis (PCA)
+Principal component analysis (PCA) is a technique for reducing the dimensionality of datasets, increasing interpretability and at the same time minimizing loss of information. This is done by creating new uncorrelated variables that successively maximize variance. The components act as new variables that are constructed as linear combinations or mixtures of the initial variables.
+The principal component analysis below indicates that the first 3 components explain more than 90% of all variance in the dataset. The first four components can explain almost all the vzriance in the data. 
 
 ```{r, fig.cap='Principal Component Analysis', fig.asp=0.5}
 #####pca#####
@@ -243,14 +238,14 @@ pc <- fviz_eig(pca.labeled,
          barfill = "brown", 
          barcolor = "black",  
          main = "Principal Component Plot",
-         xlab = "Principal Components")
+         xlab = "Principal Components") + ggeasy::easy_center_title()
 
 cum <- ggplot(cumsum, aes(x=PC, y=cumsum)) + 
   geom_point(col = "brown", size=2) + 
   geom_hline(yintercept=0.9, linetype="dashed", color = "brown", size=1) +
   labs(y="Cumm Var Exp",
   x ="Principal Components",
-  title="Cummulative Variance Explained")
+  title="Cummulative Variance Explained") + ggeasy::easy_center_title()
 
 
 (pc + cum) + plot_layout(widths = c(1, 2))
@@ -269,8 +264,14 @@ labeled.pca <- as.data.frame(pca.labeled$x)
 labeled.pca$Class <- labeled$Class
 ```
 
-It is used to measure the ratio of accurately estimated samples to the total number of samples. It can be considered that the model is the best if there is high accuracy in the model used.
 
+## Leave-One-Out Cross Validation (LOOCV)
+Leave-one-out cross-validation is a special case of cross-validation where the number of folds equals the number of instances in the data set. Thus, the learning algorithm is applied once for each instance, using all other instances as a training set and using the selected instance as a single-item test set. This is iteratively done for all n observations in the data. The LOOCV is less biased and reduces the chance of overstimatin test error rate compared to other validation approach.
+
+
+## K-Nearest Neigbhors (KNN)
+
+The KNN algorithm assumes that similar things are near to each other.To select the K (number of neighbors around a particular data point)  we run the KNN algorithm several times with different values of K and choose the K that gives the highest leave one out cross validation (LOOCV) average prediction accuracy.
 
 ```{r, fig.asp=0.5}
 #ctrl <- trainControl(method = "LOOCV")
@@ -293,27 +294,45 @@ It is used to measure the ratio of accurately estimated samples to the total num
 
 
 set.seed(12345)
-AR <- NULL
+Acc.lab <- NULL
+Acc.pca <- NULL
 for (k in 1:20) {
-test <- knn.cv(labeled.sc[,1:8],cl=labeled$Class, k)
-AR[k] <- mean(test==labeled.sc$Class)
-AC <- as.tibble(cbind(k=1:20, AR=AR))
+knn.lab <- knn.cv(labeled.sc[,1:8],cl=labeled$Class, k)
+knn.pca <- knn.cv(labeled.pca[,1:4],cl=labeled.pca$Class, k)
+Acc.lab[k] <- mean(knn.lab==labeled.sc$Class)
+Acc.pca[k] <- mean(knn.pca==labeled.pca$Class)
+AC <- as.tibble(cbind(k=1:20, ACC.lab=Acc.lab, ACC.pca=Acc.pca))
 }
 
-k <- which(AR==max(AC$AR)) # my result is 15/17
+k.lab <- which(Acc.lab==max(AC$ACC.lab)) # result is 16
+k.pca <- which(Acc.pca==max(AC$ACC.pca)) # result is 15
 
 
 
 ggplot(AC) + 
-  geom_line(aes(x=k, y=AR), color = "brown", size=1) +
-  geom_point(aes(x=k, y=AR), color = "black", size=3) + 
-  geom_vline(xintercept = 15, linetype="dashed", color = "brown", size=1)+
+  geom_line(aes(x=k, y=Acc.lab), color = "brown", size=1) +
+  geom_point(aes(x=k, y=Acc.lab), color = "black", size=3) + 
+  geom_vline(xintercept = k.lab[1], linetype="dashed", 
+             color = "brown", size=1)+
   labs(y="Accuracy(LOOCV)",
   x ="Numb of Neighbors",
-  title="Best Number of Neighbors")
+  title="Optimal Number of Neighbors")+ 
+  ggeasy::easy_center_title()
+
+
+
+optk.pca <- ggplot(AC) + 
+  geom_line(aes(x=k, y=Acc.pca), color = "brown", size=1) +
+  geom_point(aes(x=k, y=Acc.pca), color = "black", size=3) + 
+  geom_vline(xintercept = k.pca[1], linetype="dashed", 
+             color = "brown", size=1)+
+  labs(y="Accuracy(LOOCV)",
+  x ="Numb of Neighbors",
+  title="Best Number of Neighbors")+ 
+  ggeasy::easy_center_title()
 
 knn <- knn.cv(labeled.sc[,1:8],
-                     cl=labeled.sc$Class, k=min(k))
+                     cl=labeled.sc$Class, k=min(k.lab))
 
 
 
@@ -323,7 +342,10 @@ knn.acc <- conf$overall[1]
 
 
 ```
+The optimal K nearest neighbors is 16.
 
+## Quadratic Discriminant Analysis (QDA)
+Quadratic Discrimination is the general form of Bayesian discrimination. Quadratic discriminant analysis is quite similar to Linear discriminant analysis except we relaxed the assumption that the mean and covariance of all the classes were equal.
 
 ```{r}
 #ctrl <- trainControl(method = "LOOCV")
@@ -350,7 +372,9 @@ qda.acc <- qda.conf$overall[1]
 
 ```
 
+## Random Forest
 
+The Random Forest classifier contains a large number of individual decision trees, where each individual tree in the random forest produces a class prediction and the class with thr most votes becomes the model's prediction. LOOCV is used to select the optimal number of features in each tree. 
 ```{r, message=F}
 #ctrl <- trainControl(method = "LOOCV", number = 1)
 #
@@ -408,12 +432,16 @@ rf.acc <- rf.conf$overall[1]
 # width = 10, height = 7,
 # dpi = 700) 
 ```
+The optimal number of variables to use in each tree in the random forest is 2 variables. The out of bag error rates for each class of dry beans indicate that the optimal number of trees levels out after about 200 trees. 500 trees is used as the number of trees (ntree) in the final model.  
 
 
+## Model Performance
+
+There is very little difference in the performance of the three models. The QDA model performs slightly better with the highest accuracy than KNN and random Forest model. Each of theses models can be used as the final model.  
 ```{r, fig.asp=0.5}
 acc.data <- data.frame(cbind(Model=c("KNN", "QDA", "RF"), rbind(table(knn), table(qda$class), table(m$predicted)), Accuracy=round(rbind(knn.acc, qda.acc, rf.acc),3)), row.names = NULL )
 #acc.data
-model.plot <- ggplot(acc.data, aes(x=Model, y=Accuracy)) + geom_col(width = .60, aes(fill=Model), show.legend = F)
+model.plot <- ggplot(acc.data, aes(x=Model, y=Accuracy)) + geom_col(width = .60, aes(fill=Model), show.legend = F) + ggeasy::easy_center_title()
 
 
 (wrap_elements(gridExtra::tableGrob(acc.data)) / model.plot ) + plot_layout(widths = c(1, 2)) + plot_annotation(
@@ -428,16 +456,21 @@ pred.label.dat <- as.data.frame(cbind("class"=qda$class,
 
 ```
 
+## Visualizing Best Selected Model
+
+The diagram below shows that the QDA model performs very well on the training dataset. This model produces very similar classification. 
 ```{r, fig.height=5, fig.width=9, fig.cap='Final selected model (QDA)'}
 grid.arrange(
 ggplot(labeled)+geom_point(aes(x=Extent, y=Eccentricity,col=Class), size=.5)+ labs(title = "True Labeled")+ 
-  theme(legend.position="bottom"),
-ggplot(pred.label.dat)+geom_point(aes(x=Extent, y=Eccentricity,col=class), size=.5)+ labs(title = "LOOCV qda Labeled") + theme(legend.position="bottom"), ncol=2)
+  theme(legend.position="bottom") + ggeasy::easy_center_title(),
+ggplot(pred.label.dat)+geom_point(aes(x=Extent, y=Eccentricity,col=class), size=.5)+ labs(title = "LOOCV qda Labeled") + theme(legend.position="bottom") + ggeasy::easy_center_title(), ncol=2)
 ```
 
 
 
+## Results (Classification of Sample Data)
 
+Class predictions are very similaar to the true labeled data.
 
 
 ```{r}
@@ -445,14 +478,11 @@ sample_data <- data.frame(rbind(sampA, sampB, sampC))
 
 qda <- qda(Class~., data = labeled, CV = FALSE)
   
-```
-
-```{r}
 
 
 qda_predict <- predict(qda, newdata = sample_data)
 
-table(qda_predict$class)
+#table(qda_predict$class)
 
 
 pred.samp.dat <- as.data.frame(cbind("class"=qda_predict$class,sample_data))
@@ -462,7 +492,31 @@ pred.samp.dat <- as.data.frame(cbind("class"=qda_predict$class,sample_data))
 ```{r,fig.height=5, fig.width=9}
 grid.arrange(
 ggplot(labeled)+geom_point(aes(x=Extent, y=Eccentricity,col=Class), size=.5)+ labs(title = "True Labeled")+ 
-  theme(legend.position="bottom"),
-ggplot(pred.samp.dat)+geom_point(aes(x=Extent, y=Eccentricity,col=class), size=.5)+ labs(title = "LOOCV qda Labeled") + theme(legend.position="bottom"), ncol=2)
+  theme(legend.position="bottom") + ggeasy::easy_center_title(),
+ggplot(pred.samp.dat)+geom_point(aes(x=Extent, y=Eccentricity,col=class), size=.5)+ labs(title = "Unlabeled") + theme(legend.position="bottom") + ggeasy::easy_center_title(), ncol=2)
 ```
 
+
+### Acknowledgement.
+
+I would like to give credit to the following persons for their valuable contribution to all aspects of this project; Jie Hu, Kenneth Annan, Siyi Lui and Iftekhar Chowdhury.
+
+\newpage
+
+# References
+
+1. James, G., Witten, D., Hastie, T., & Tibshirani, R. (2013). An introduction to statistical learning (Vol. 112, p. 18). New York: springer.
+
+2. Heuzé V., Tran G., Nozière P., & Lebas F. (2015). Common Bean (Phaseolus vulgaris), Feedipedia.org – Animal Feed Resources Information System – A programme by INRA, CIRAD, AFZ and FAO, http://www.feedipedia.org/node/266 (accessed on 29 April 2021).
+
+3. Koklu, M., & Ozkan, I. A. (2020). Multiclass classification of dry beans using computer vision and ma-chine learning techniques. Computers and Electronics in Agriculture, 174, 105507. doi:10.1016/j.compag.2020.105507
+
+4. Varankaya, S., & Ceyhan, E. (2012). Problems Encountered in Bean Farming in the Central Anatolia Region and Solution Suggestions. Selçuk Tarım Bilim. Journal. 26, 15–26.
+
+5. https://en.m.wikipedia.org/wiki/Sensitivity_and_specificity
+
+6. https://www.geeksforgeeks.org/loocvleave-one-out-cross-validation-in-r-programming/
+
+7. https://towardsdatascience.com/what-is-out-of-bag-oob-score-in-random-forest-a7fa23d710
+
+8. https://alekhyo.medium.com/interview-questions-on-svm-bf13e5fbcca8://alekhyo.medium.com/interview-questions-on-svm-bf13e5fbcca8
